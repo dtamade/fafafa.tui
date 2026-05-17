@@ -10,12 +10,18 @@ program test_runner;
 uses
   SysUtils,
   ftui_testkit,
-  test_rect;
+  test_rect,
+  test_color,
+  test_modifier,
+  test_style;
 
 var
   Failed: Integer;
 begin
   RegisterRectTests;
+  RegisterColorTests;
+  RegisterModifierTests;
+  RegisterStyleTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

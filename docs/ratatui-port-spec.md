@@ -62,16 +62,21 @@ pub enum Color {
 ```pascal
 // ftui_color.pas
 type
-  TColorKind = (ckReset, ckIndexed, ckRgb);
+  TColorKind = (ckUnset, ckReset, ckIndexed, ckRgb);
+  // ckUnset   = ratatui Option<Color>::None 等价物（Patch 时由 other 接管）
+  // ckReset   = Color::Reset 等价物（显式重置到终端默认）
+  // ckIndexed = 0..255（其中 0..15 是 ratatui 16 named colors）
+  // ckRgb     = 24-bit truecolor
 
   TColor = packed record
     Kind: TColorKind;
     case Byte of
-      0: (Index: Byte);            // for ckIndexed; named colors map to 0..15
-      1: (R, G, B: Byte);          // for ckRgb
+      0: (Index: Byte);            // ckIndexed
+      1: (R, G, B: Byte);          // ckRgb
   end;
 
-// Constructors (无构造，直接函数返回 record)
+// Constructors（按值返回，零分配）
+function UnsetColor: TColor; inline;
 function ResetColor: TColor; inline;
 function IndexedColor(I: Byte): TColor; inline;
 function RgbColor(R, G, B: Byte): TColor; inline;
@@ -153,29 +158,34 @@ impl Style {
 // ftui_style.pas
 type
   TStyle = packed record
-    FgKind: (skNone, skSet);
-    Fg: TColor;
-    BgKind: (skNone, skSet);
-    Bg: TColor;
-    UlKind: (skNone, skSet);
-    Ul: TColor;
-    AddMod: TModifier;
-    SubMod: TModifier;
+    Fg, Bg, Ul: TColor;            // ckUnset = ratatui None；其他 = Some(...)
+    AddMod, SubMod: TModifier;
 
     class function Default: TStyle; static; inline;
     function WithFg(const C: TColor): TStyle;
     function WithBg(const C: TColor): TStyle;
     function WithUnderline(const C: TColor): TStyle;
-    function WithModifier(const M: TModifier): TStyle;        // = AddMod
-    function WithoutModifier(const M: TModifier): TStyle;     // = SubMod
-    function Patch(const Other: TStyle): TStyle;
+    function WithModifier(const M: TModifier): TStyle;        // 加入 AddMod，从 SubMod 移除
+    function WithoutModifier(const M: TModifier): TStyle;     // 加入 SubMod，从 AddMod 移除
+    function Patch(const Other: TStyle): TStyle;              // 见下文 ratatui 语义
   end;
 
-function StyleDefault: TStyle; inline;
 function StyleEquals(const A, B: TStyle): Boolean;
 ```
 
-注：Rust `Option<Color>` 翻译成 `FgKind/BgKind/UlKind` 三个独立 enum + 同名 TColor 字段，避免引入 `TOptionalColor` 类型。
+`TColor.Kind = ckUnset` 直接当 ratatui `Option<Color>::None` 用，省掉 `FgKind/BgKind/UlKind` 三个伴生枚举。
+
+**Patch 语义（与 ratatui 0.29 `Style::patch` 1:1 对齐）：**
+
+```text
+self.Fg := if Other.Fg.Kind <> ckUnset then Other.Fg else self.Fg
+self.Bg := if Other.Bg.Kind <> ckUnset then Other.Bg else self.Bg
+self.Ul := if Other.Ul.Kind <> ckUnset then Other.Ul else self.Ul
+self.AddMod := (self.AddMod - Other.SubMod) + Other.AddMod
+self.SubMod := (self.SubMod - Other.AddMod) + Other.SubMod
+```
+
+modifier 用双 set 互斥维护：任何一位永远不可能同时出现在 AddMod 和 SubMod 里，patch 后写入方覆盖原状态。这跟 ratatui bitflags `remove + insert` 等价，Pascal `set` 集合运算（`-` 差集、`+` 并集）天然贴合。
 
 ## 2. Cell + Buffer
 
