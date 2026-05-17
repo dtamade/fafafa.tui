@@ -12,15 +12,16 @@ unit ftui_testkit;
 //   - Failing assertions throw EFtuiTestFailed with enough context to
 //     locate the call site without a debugger.
 //   - AssertBufferEquals is the centerpiece: ratatui-style snapshot
-//     comparison. When a buffer differs from the expected lines, the
-//     output shows expected/actual side-by-side with row markers.
+//     comparison.  When a buffer differs from expected, the message
+//     contains a row-by-row diff with `*` markers on mismatched rows.
 
 {$mode objfpc}{$H+}
 
 interface
 
 uses
-  SysUtils;
+  SysUtils,
+  ftui_buffer;
 
 type
   EFtuiTestFailed = class(Exception);
@@ -33,7 +34,7 @@ type
   end;
 
 procedure RegisterTest(const AName: AnsiString; AProc: TTestProc);
-function RunAllTests: Integer;   // returns 0 if all passed, otherwise count of failures
+function RunAllTests: Integer;
 
 procedure Assert_(Cond: Boolean; const Msg: AnsiString);
 procedure AssertEqInt(Expected, Actual: Int64; const Ctx: AnsiString);
@@ -42,10 +43,12 @@ procedure AssertEqBool(Expected, Actual: Boolean; const Ctx: AnsiString);
 procedure AssertTrue(Cond: Boolean; const Ctx: AnsiString);
 procedure AssertFalse(Cond: Boolean; const Ctx: AnsiString);
 
-// Buffer snapshot assertion is implemented in test units that import
-// ftui_buffer (avoids a circular include here). This unit exposes only
-// the formatting helper used to render the diff.
-function FormatBufferDiff(const ExpectedLines, ActualLines: array of AnsiString): AnsiString;
+// Compare a live TBuffer against a list of expected row strings.  Each
+// line shorter than buffer width is right-padded with spaces; longer
+// lines are clipped — same convenience as ratatui Buffer::with_lines.
+//
+// On mismatch raises EFtuiTestFailed with a row-by-row diff.
+procedure AssertBufferEquals(ABuf: TBuffer; const Expected: array of AnsiString);
 
 implementation
 
@@ -79,7 +82,7 @@ begin
       on E: EFtuiTestFailed do
       begin
         WriteLn('  FAILED  ', Started);
-        WriteLn('    ', E.Message);
+        WriteLn(E.Message);
         Inc(Failed);
       end;
       on E: Exception do
@@ -137,26 +140,64 @@ begin
     raise EFtuiTestFailed.CreateFmt('%s: expected False', [Ctx]);
 end;
 
-function FormatBufferDiff(const ExpectedLines, ActualLines: array of AnsiString): AnsiString;
+// Internal: build a single AnsiString carrying the expected/actual diff.
+// Cold path so we don't have to micro-optimize allocation.
+function FormatDiff(const Expected, Actual: array of AnsiString;
+  W: Integer): AnsiString;
 var
-  I, MaxRows: Integer;
-  Result_: AnsiString;
+  I: Integer;
   Marker: AnsiString;
-  Exp, Act: AnsiString;
+  ExpRow, ActRow: AnsiString;
 begin
-  Result_ := 'buffer mismatch:' + LineEnding;
-  Result_ := Result_ + '  row | expected                          | actual' + LineEnding;
-  MaxRows := Length(ExpectedLines);
-  if Length(ActualLines) > MaxRows then
-    MaxRows := Length(ActualLines);
-  for I := 0 to MaxRows - 1 do
+  Result := 'buffer mismatch (width=' + IntToStr(W) + '):' + LineEnding;
+  Result := Result + Format('  row | %-*s | %s', [W, 'expected', 'actual']) + LineEnding;
+  for I := 0 to Length(Expected) - 1 do
   begin
-    if I < Length(ExpectedLines) then Exp := ExpectedLines[I] else Exp := '<missing>';
-    if I < Length(ActualLines)   then Act := ActualLines[I]   else Act := '<missing>';
-    if Exp = Act then Marker := '   ' else Marker := ' * ';
-    Result_ := Result_ + Format(' %s%2d | %-32s | %s', [Marker, I, Exp, Act]) + LineEnding;
+    if I < Length(Expected) then ExpRow := Expected[I] else ExpRow := '<missing>';
+    if I < Length(Actual)   then ActRow := Actual[I]   else ActRow := '<missing>';
+    if ExpRow = ActRow then Marker := '   ' else Marker := ' * ';
+    Result := Result + Format(' %s%2d | %-*s | %s',
+      [Marker, I, W, ExpRow, ActRow]) + LineEnding;
   end;
-  Result := Result_;
+end;
+
+procedure AssertBufferEquals(ABuf: TBuffer; const Expected: array of AnsiString);
+var
+  Actual: TBufferLines;
+  ExpectedCopy: array of AnsiString;
+  W, I, ExpLen, Mismatches: Integer;
+begin
+  W := ABuf.Width;
+  if Length(Expected) <> ABuf.Height then
+    raise EFtuiTestFailed.CreateFmt(
+      'AssertBufferEquals: expected %d rows, buffer has %d',
+      [Length(Expected), ABuf.Height]);
+
+  SetLength(ExpectedCopy, Length(Expected));
+  for I := 0 to High(Expected) do
+  begin
+    ExpLen := Length(Expected[I]);
+    if ExpLen = W then
+      ExpectedCopy[I] := Expected[I]
+    else if ExpLen < W then
+    begin
+      SetLength(ExpectedCopy[I], W);
+      if ExpLen > 0 then
+        Move(Expected[I][1], ExpectedCopy[I][1], ExpLen);
+      FillChar(ExpectedCopy[I][ExpLen + 1], W - ExpLen, Ord(' '));
+    end
+    else
+      ExpectedCopy[I] := Copy(Expected[I], 1, W);
+  end;
+
+  Actual := ABuf.AsLines;
+  Mismatches := 0;
+  for I := 0 to High(Actual) do
+    if ExpectedCopy[I] <> Actual[I] then
+      Inc(Mismatches);
+
+  if Mismatches > 0 then
+    raise EFtuiTestFailed.Create(FormatDiff(ExpectedCopy, Actual, W));
 end;
 
 end.

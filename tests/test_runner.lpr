@@ -13,7 +13,9 @@ uses
   test_rect,
   test_color,
   test_modifier,
-  test_style;
+  test_style,
+  test_cell,
+  test_buffer;
 
 var
   Failed: Integer;
@@ -22,6 +24,8 @@ begin
   RegisterColorTests;
   RegisterModifierTests;
   RegisterStyleTests;
+  RegisterCellTests;
+  RegisterBufferTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)
