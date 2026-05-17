@@ -1,0 +1,10 @@
+build/
+*.o
+*.ppu
+*.compiled
+*.or
+*.a.lpi
+*.lps
+*.bak
+link*.res
+ppas.sh
