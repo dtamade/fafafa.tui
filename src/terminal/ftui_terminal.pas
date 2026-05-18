@@ -39,8 +39,10 @@ uses
   termio,
   ftui_rect,
   ftui_buffer,
+  ftui_overlay,
   ftui_event,
   ftui_input_parser,
+  ftui_interaction,
   ftui_ansi_backend,
   ftui_termios;
 
