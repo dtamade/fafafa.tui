@@ -102,6 +102,11 @@ var
   SlashMenuSel: Integer;
   SlashMenuFilter: AnsiString;
   ToolStatusLine: AnsiString;
+  // Input history (ring buffer of sent messages).
+  InputHistory: array[0..49] of AnsiString;
+  InputHistCount: Integer;
+  InputHistIdx: Integer;       // -1 = not browsing; 0..N-1 = browsing
+  InputHistSaved: AnsiString;  // saved current input when entering history
 
 // === Helpers ===
 
@@ -176,24 +181,23 @@ end;
 function RenderMessage(Buf: TBuffer; const M: TMsg; X, Y, W: Integer): Integer;
 var
   Indicator: AnsiString;
-  IndSty, ContentSty, BgSty: TStyle;
+  IndSty, ContentSty: TStyle;
   I, ContentCol, SliceStart, LineCount_: Integer;
   Lines: array of AnsiString;
 begin
   Result := 0;
   if W <= 4 then Exit;
   case M.Role of
-    mrUser:    begin Indicator := ' ' + SYM_USER + ' '; IndSty := Theme.UserLabel; ContentSty := Theme.PrimaryText; BgSty := TStyle.Default; end;
-    mrAI:      begin Indicator := ' ' + SYM_AI + ' '; IndSty := Theme.AiLabel; ContentSty := TStyle.Default.WithFg(Theme.FgPrimary); BgSty := TStyle.Default.WithBg(Theme.BgAiMsg); end;
-    mrTool:    begin Indicator := '  ' + SYM_TOOL + ' '; IndSty := Theme.ToolLabel; ContentSty := TStyle.Default.WithFg(Theme.StatusSuccess); BgSty := TStyle.Default; end;
-    mrSystem:  begin Indicator := ' ' + SYM_SYSTEM + ' '; IndSty := Theme.SystemLabel; ContentSty := TStyle.Default.WithFg(Theme.AccentBrand); BgSty := TStyle.Default.WithBg(Theme.BgSystem); end;
-    mrThinking:begin Indicator := ' ' + SYM_THINK + ' '; IndSty := Theme.InfoLabel; ContentSty := Theme.MutedText; BgSty := TStyle.Default.WithBg(Theme.BgThinking); end;
+    mrUser:    begin Indicator := ' ' + SYM_USER + ' '; IndSty := TStyle.Default.WithFg(clCyan).WithModifier([mbBold]); ContentSty := TStyle.Default; end;
+    mrAI:      begin Indicator := ' ' + SYM_AI + ' '; IndSty := TStyle.Default.WithFg(clGreen).WithModifier([mbBold]); ContentSty := TStyle.Default; end;
+    mrTool:    begin Indicator := '  ' + SYM_TOOL + ' '; IndSty := TStyle.Default.WithFg(clYellow).WithModifier([mbBold]); ContentSty := TStyle.Default.WithFg(clGreen); end;
+    mrSystem:  begin Indicator := ' ' + SYM_SYSTEM + ' '; IndSty := TStyle.Default.WithFg(clMagenta); ContentSty := TStyle.Default.WithFg(clMagenta); end;
+    mrThinking:begin Indicator := ' ' + SYM_THINK + ' '; IndSty := TStyle.Default.WithFg(clBlue); ContentSty := TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]); end;
   end;
-  // Only AI/System/Thinking get a background color block.
   // User and Tool messages use terminal default background (no bg set).
 
   // AI top padding.
-  if M.Role = mrAI then begin Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty); Inc(Y); Inc(Result); end;
+  if M.Role = mrAI then begin Inc(Y); Inc(Result); end;
   // Split content.
   LineCount_ := 1;
   for I := 1 to Length(M.Content) do if M.Content[I] = #10 then Inc(LineCount_);
@@ -203,18 +207,16 @@ begin
   Lines[LineCount_] := Copy(M.Content, SliceStart, Length(M.Content) - SliceStart + 1); Inc(LineCount_);
   ContentCol := GraphemeWidth(Indicator);
   // First line.
-  Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-  Buf.SetStringN(X, Y, Indicator, W, IndSty.Patch(BgSty));
-  if LineCount_ > 0 then Buf.SetStringN(X + ContentCol, Y, Lines[0], W - ContentCol, ContentSty.Patch(BgSty));
+  Buf.SetStringN(X, Y, Indicator, W, IndSty);
+  if LineCount_ > 0 then Buf.SetStringN(X + ContentCol, Y, Lines[0], W - ContentCol, ContentSty);
   Inc(Y); Inc(Result);
   // Subsequent lines.
   for I := 1 to LineCount_ - 1 do begin
-    Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-    Buf.SetStringN(X + ContentCol, Y, Lines[I], W - ContentCol, ContentSty.Patch(BgSty));
+    Buf.SetStringN(X + ContentCol, Y, Lines[I], W - ContentCol, ContentSty);
     Inc(Y); Inc(Result);
   end;
   // AI bottom padding.
-  if M.Role = mrAI then begin Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty); Inc(Result); end;
+  if M.Role = mrAI then begin Inc(Result); end;
 end;
 
 procedure RenderFrame;
@@ -404,6 +406,7 @@ begin
   end;
   if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin Term.RequestQuit; Exit; end;
   if (K.Code = kcChar) and (K.Ch = Ord('l')) and (kmCtrl in K.Modifiers) then begin MsgCount := 0; ScrollOffset := 0; Exit; end;
+  if (K.Code = kcChar) and (K.Ch = Ord('d')) and (kmCtrl in K.Modifiers) then begin if Editor.IsEmpty then Term.RequestQuit; Exit; end;
   case K.Code of
     kcEsc: Term.RequestQuit;
     kcEnter:
@@ -421,8 +424,39 @@ begin
     end;
     kcLeft: Editor.MoveLeft;
     kcRight: Editor.MoveRight;
-    kcUp: if Editor.LineCount > 1 then Editor.MoveUp else Inc(ScrollOffset);
-    kcDown: if Editor.LineCount > 1 then Editor.MoveDown else begin Dec(ScrollOffset); if ScrollOffset < 0 then ScrollOffset := 0; end;
+    kcUp:
+      if Editor.LineCount > 1 then
+        Editor.MoveUp
+      else begin
+        // Input history: ↑ browses previous messages.
+        if InputHistIdx < 0 then begin
+          InputHistSaved := Editor.Content;
+          InputHistIdx := InputHistCount;
+        end;
+        if InputHistIdx > 0 then begin
+          Dec(InputHistIdx);
+          Editor.Clear;
+          for I := 1 to Length(InputHistory[InputHistIdx]) do
+            Editor.InsertChar(Ord(InputHistory[InputHistIdx][I]));
+        end;
+      end;
+    kcDown:
+      if Editor.LineCount > 1 then
+        Editor.MoveDown
+      else begin
+        // Input history: ↓ browses forward.
+        if InputHistIdx >= 0 then begin
+          Inc(InputHistIdx);
+          Editor.Clear;
+          if InputHistIdx >= InputHistCount then begin
+            InputHistIdx := -1;
+            for I := 1 to Length(InputHistSaved) do
+              Editor.InsertChar(Ord(InputHistSaved[I]));
+          end else
+            for I := 1 to Length(InputHistory[InputHistIdx]) do
+              Editor.InsertChar(Ord(InputHistory[InputHistIdx][I]));
+        end;
+      end;
     kcHome: Editor.MoveHome;
     kcEnd: Editor.MoveEnd;
     kcPageUp: Inc(ScrollOffset, 5);
@@ -442,6 +476,7 @@ begin
   ScrollOffset := 0; ThinkTick := 0; SpinnerTick := 0;
   SlashMenuSel := 0; SlashMenuFilter := '';
   ToolStatusLine := '';
+  InputHistCount := 0; InputHistIdx := -1; InputHistSaved := '';
   ModelName := 'claude-opus-4-7';
   CwdPath := '~/projects/fafafa.tui';
 
