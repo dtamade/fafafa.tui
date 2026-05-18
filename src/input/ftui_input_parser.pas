@@ -12,26 +12,20 @@ unit ftui_input_parser;
 //   prInvalid : input doesn't match any recognised pattern;
 //               caller should drop one byte and try again
 //
-// Pattern coverage (matches cli888 surface):
+// Supported patterns:
 //   - Printable ASCII / control bytes -> kcChar, kcEnter, kcTab,
 //     kcBackspace, ctrl-letter combinations
-//   - ESC alone (with caller-provided "no more bytes" hint) -> kcEsc
-//   - ESC <ch>      -> Alt + kcChar(ch) or Alt + kcEnter etc.
-//   - CSI A/B/C/D   -> Up/Down/Right/Left arrows
-//   - CSI H/F       -> Home/End
-//   - CSI 1~..6~    -> Home/Insert/Delete/End/PageUp/PageDown
-//   - CSI 11..15~ etc -> F1..F12
-//   - CSI Z         -> BackTab (Shift-Tab)
-//   - CSI 1;<mods> letter -> arrows / Home / End with modifiers
-//   - SS3 P/Q/R/S   -> F1..F4 (legacy)
-//   - SGR mouse "ESC[<b;x;yM" / "m" -> mkScrollUp/Down/LeftDown
-//
-// Out of scope:
-//   - Bracketed paste (CSI 200~ / 201~)
-//   - Focus events (CSI I / O)
-//   - Kitty keyboard protocol CSI u
-//   - X10 / X11 mouse encodings (only modern SGR)
-//   - UTF-8 multibyte character decoding (M1 ASCII; M2.1 will widen)
+//   - UTF-8 multi-byte -> kcChar with full UCS-4 codepoint
+//   - ESC alone (with AtEOF hint) -> kcEsc
+//   - ESC <ch> -> Alt + kcChar(ch) or Alt + kcEnter etc.
+//   - CSI A/B/C/D -> arrows; CSI H/F -> Home/End
+//   - CSI 1~..6~ -> Home/Insert/Delete/End/PageUp/PageDown
+//   - CSI 11~..24~ -> F1..F12; CSI Z -> BackTab
+//   - CSI 1;<mods> letter -> arrows/Home/End with modifiers
+//   - CSI <keycode>;<mods>u -> kitty keyboard protocol (Shift+Enter etc)
+//   - SS3 P/Q/R/S -> F1..F4 (legacy)
+//   - SGR mouse (CSI < b;x;y M/m) -> mkDown/mkUp/mkMoved/mkDrag/mkScrollUp/mkScrollDown
+//     with button (left/middle/right/none) and modifiers
 
 {$mode objfpc}{$H+}{$inline on}
 {$packenum 1}

@@ -1,23 +1,18 @@
 unit ftui_event;
 
-// Input event types — what InputParser produces and Terminal hands
-// back from PollEvent.
+// Input event types — TTerminal.PollEvent produces these.
 //
-// Scope (matches cli888):
-//   - Key events: printable chars + Esc/Enter/Tab/BackTab/Backspace/
-//     Delete/arrows/Home/End/PageUp/PageDown/Insert/F1..F12
-//   - Mouse: scroll wheel up/down + single left click (cli888 uses
-//     ScrollUp 7, ScrollDown 5, LeftDown 1)
-//   - Resize: terminal size changed (delivered after SIGWINCH)
+// Mouse model (stable contract):
+//   mkDown / mkUp / mkMoved / mkDrag / mkScrollUp / mkScrollDown
+//   All events carry 0-based cell coordinates, button, and modifiers.
+//   Motion tracking (CSI ?1003h) is enabled automatically by TTerminal.
 //
-// Out of scope (cli888 uses 0):
-//   - Bracketed paste (TEventKind would need evPaste)
-//   - Focus events (gain/lost)
-//   - Kitty keyboard protocol (key release, repeat, super-modifiers)
-//   - Mouse drag, hover, middle/right click
+// Keyboard model:
+//   17 KeyCodeKind values + UCS-4 codepoint for kcChar.
+//   CSI u (kitty protocol) supported for Shift+Enter etc.
 //
-// All payload records are `packed record` so the union variant
-// dispatch costs one byte and the whole TEvent passes by register.
+// Resize:
+//   Delivered after SIGWINCH; buffers already resized by TTerminal.
 
 {$mode objfpc}{$H+}{$inline on}
 {$packenum 1}

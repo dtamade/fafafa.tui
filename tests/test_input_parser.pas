@@ -231,10 +231,50 @@ end;
 
 procedure Test_MouseLeftDown;
 begin
-  // btn=0 with M (press) -> LeftDown
+  // btn=0 with M (press) -> mkDown
   ExpectMouse([27, Ord('['), Ord('<'), Ord('0'), Ord(';'),
                Ord('5'), Ord(';'), Ord('3'), Ord('M')],
               mkDown, 4, 2, 9, 'SGR left down at (5,3) -> (4,2)');
+end;
+
+procedure Test_MouseLeftUp;
+begin
+  // btn=0 with 'm' (release) -> mkUp
+  ExpectMouse([27, Ord('['), Ord('<'), Ord('0'), Ord(';'),
+               Ord('1'), Ord('0'), Ord(';'), Ord('7'), Ord('m')],
+              mkUp, 9, 6, 10, 'SGR left up at (10,7) -> (9,6)');
+end;
+
+procedure Test_MouseMoved;
+begin
+  // btn=35 (32+3) with M -> motion, button bits=3 -> no button -> mkMoved
+  ExpectMouse([27, Ord('['), Ord('<'), Ord('3'), Ord('5'), Ord(';'),
+               Ord('2'), Ord('0'), Ord(';'), Ord('1'), Ord('5'), Ord('M')],
+              mkMoved, 19, 14, 12, 'SGR moved at (20,15) -> (19,14)');
+end;
+
+procedure Test_MouseDragLeft;
+begin
+  // btn=32 (32+0) with M -> motion, button bits=0 -> left drag -> mkDrag
+  ExpectMouse([27, Ord('['), Ord('<'), Ord('3'), Ord('2'), Ord(';'),
+               Ord('5'), Ord(';'), Ord('5'), Ord('M')],
+              mkDrag, 4, 4, 10, 'SGR left drag at (5,5) -> (4,4)');
+end;
+
+procedure Test_MouseMiddleDown;
+begin
+  // btn=1 with M -> middle press
+  ExpectMouse([27, Ord('['), Ord('<'), Ord('1'), Ord(';'),
+               Ord('3'), Ord(';'), Ord('3'), Ord('M')],
+              mkDown, 2, 2, 9, 'SGR middle down at (3,3) -> (2,2)');
+end;
+
+procedure Test_MouseRightUp;
+begin
+  // btn=2 with 'm' -> right release
+  ExpectMouse([27, Ord('['), Ord('<'), Ord('2'), Ord(';'),
+               Ord('1'), Ord(';'), Ord('1'), Ord('m')],
+              mkUp, 0, 0, 9, 'SGR right up at (1,1) -> (0,0)');
 end;
 
 procedure Test_PartialCsiNeedsMore;
@@ -300,6 +340,11 @@ begin
   RegisterTest('input / SS3 F1..F4',                      @Test_SS3FunctionKeys);
   RegisterTest('input / mouse scroll up/down',            @Test_MouseScroll);
   RegisterTest('input / mouse left-down',                 @Test_MouseLeftDown);
+  RegisterTest('input / mouse left-up',                   @Test_MouseLeftUp);
+  RegisterTest('input / mouse moved (no button)',         @Test_MouseMoved);
+  RegisterTest('input / mouse drag left',                 @Test_MouseDragLeft);
+  RegisterTest('input / mouse middle-down',               @Test_MouseMiddleDown);
+  RegisterTest('input / mouse right-up',                  @Test_MouseRightUp);
   RegisterTest('input / partial CSI -> NeedMore',         @Test_PartialCsiNeedsMore);
   RegisterTest('input / unknown CSI body -> Invalid',     @Test_InvalidCsiBody);
   RegisterTest('input / adjacent events consume only first', @Test_AdjacentEventsConsumeOnlyFirst);
