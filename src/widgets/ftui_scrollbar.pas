@@ -148,6 +148,7 @@ procedure TScrollbar.Render(const TrackArea: TRect; ABuf: TBuffer; const Sty: TS
 var
   Y, TS, TSz: Integer;
   C: TCell;
+  P: PCell;
 begin
   if TrackArea.Width < 1 then Exit;
   TS := ThumbStart(TrackArea.Height);
@@ -165,7 +166,8 @@ begin
       CellSetSymbolAscii(C, Sty.TrackChar);
       CellApplyStyle(C, Sty.TrackStyle);
     end;
-    ABuf.CellAt(TrackArea.X, TrackArea.Y + Y)^ := C;
+    P := ABuf.CellAt(TrackArea.X, TrackArea.Y + Y);
+    if P <> nil then P^ := C;
   end;
 end;
 
