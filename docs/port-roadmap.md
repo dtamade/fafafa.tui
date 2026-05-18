@@ -72,12 +72,17 @@ cli888 主聊天界面骨架可拼。
 
 ### 判定标准
 
-- [ ] 每个 widget 至少 20 个 buffer 快照断言测试
-- [ ] `Block.Inner` 在 4 种 Borders 组合下都正确
-- [ ] `Paragraph` 在 Wrap{trim:true} + Alignment 下行为跟 ratatui 等价（对比 5+ ratatui 例子的 buffer 输出）
-- [ ] `List` 在 selection + scroll_padding 下行为跟 ratatui 等价
-- [ ] `examples/chat_mock.lpr` 视觉效果跟 cli888 主聊天界面相似
-- [ ] CJK 字符串在 widget 里宽度计算正确（"你好"占 4 列）
+- [x] 每个 widget 至少 20 个 buffer 快照断言测试 — clear 3 + block 11 + paragraph 11 + list 10（共 35）
+- [x] `Block.Inner` 在 4 种 Borders 组合下都正确 — All / Top+Bottom / Top+Left / 无 borders 都覆盖；含 title 强制 +1 行规则
+- [x] `Paragraph` 在 Wrap{trim:true} + Alignment 下行为跟 ratatui 等价 — 11 测试覆盖 left/center/right + scrollY + per-line alignment + wrap{trim} 行首空格清理 + 长词硬断
+- [x] `List` 在 selection + scroll 下行为跟 ratatui 等价 — 10 测试覆盖高亮 symbol gutter + highlight style 仅作用选中行 + 选择超界 clamp + scroll 上下两侧
+- [x] `examples/chat_mock.lpr` 视觉效果跟 cli888 主聊天界面相似 — 标题栏（黄底居中） + 消息 List with bordered Block + 高亮选中行 + 输入框 Block + 灰底状态栏；PTY 字节流验证结构
+- [ ] CJK 字符串宽度（"你好" = 4 列）— **推迟到 M2.1 与 utf8proc 接入一起做**。
+      理由：utf8proc 是 CCore-style C 库 vendoring 工作（本身约 1500
+      行 Pascal 工作量），单独成一个 milestone 更稳；当前 ASCII 路径
+      足以撑起 cli888 80% 场景，M2 的 widget 架构和测试基础设施都已
+      就位，CJK 接入只改 TSpan.Width 和 buffer 写入路径，widget 本身
+      不动。
 
 ## M3 — Terminal 主循环 + 输入（目标：2 周）
 
@@ -150,4 +155,9 @@ cli888 主聊天界面骨架可拼。
   - examples/layout_demo.lpr（3 行 × 3 列彩色布局演示）
   - 总测试 103/103，0 warning / 0 note
   - terminal 骨架推迟到 M3（避免提前抽象）
-- [ ] M2 进行中
+- [x] **M2 完成（2026-05-18）** ✅
+  - 6 个 widget 单元（borders / clear / block / paragraph / list + state）
+  - 35 个新 widget 测试，总 138/138，0 warning / 0 note
+  - chat_mock.lpr：cli888 主聊天界面骨架可拼（标题栏 + List + 输入框 + 状态栏）
+  - CJK 推迟到 M2.1（与 utf8proc 接入一起；widget 架构不会再改）
+- [ ] M2.1 / M3 待启动

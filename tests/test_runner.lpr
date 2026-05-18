@@ -21,7 +21,11 @@ uses
   test_ansi_backend,
   test_text,
   test_layout,
-  test_test_backend;
+  test_test_backend,
+  test_clear,
+  test_block,
+  test_paragraph,
+  test_list;
 
 var
   Failed: Integer;
@@ -38,6 +42,10 @@ begin
   RegisterTextTests;
   RegisterLayoutTests;
   RegisterTestBackendTests;
+  RegisterClearTests;
+  RegisterBlockTests;
+  RegisterParagraphTests;
+  RegisterListTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

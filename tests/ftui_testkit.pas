@@ -177,17 +177,22 @@ begin
   for I := 0 to High(Expected) do
   begin
     ExpLen := Length(Expected[I]);
-    if ExpLen = W then
+    if ExpLen >= W then
+      // Use as-is.  Equal-byte path covers pure ASCII (1 byte = 1
+      // column), and the longer-byte path covers rows with multi-byte
+      // graphemes (3 bytes per box-drawing char etc).  Either way the
+      // expected string IS the byte stream we'll compare against.
       ExpectedCopy[I] := Expected[I]
-    else if ExpLen < W then
+    else
     begin
+      // Convenience: pad short ASCII expected rows with spaces.
+      // Lets test authors write '+' for a 1-cell border without
+      // padding to full width.
       SetLength(ExpectedCopy[I], W);
       if ExpLen > 0 then
         Move(Expected[I][1], ExpectedCopy[I][1], ExpLen);
       FillChar(ExpectedCopy[I][ExpLen + 1], W - ExpLen, Ord(' '));
-    end
-    else
-      ExpectedCopy[I] := Copy(Expected[I], 1, W);
+    end;
   end;
 
   Actual := ABuf.AsLines;
