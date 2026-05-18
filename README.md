@@ -1,20 +1,27 @@
 # fafafa.tui
 
-Pascal 项目的 **TUI 渲染层**。把 Rust 生态里 ratatui 的核心思想——**immediate mode + 双缓冲 diff + 数组化 cell 布局**——以 FreePascal 原生方式重写出来，让 Pascal 项目能够构建现代终端用户界面，而不需要 fpGUI、不需要 ncurses、不需要 Free Vision。
+Pascal 项目的 **通用 TUI 运行时**。从 CLI 聊天到图形编辑器的全谱终端交互。当前消费方：cli888-pascal（聊天 TUI）、tui-design（画布编辑器）。
 
 ## 定位
 
-`fafafa.tui` 不是 ratatui 的完整移植，是 **cli888-pascal 真实需要的 ratatui 子集**。范围按 cli888 的实际使用面冻结，不做无用功。
+`fafafa.tui` 是通用 TUI 运行时，支持从 CLI 聊天到图形编辑器的全谱交互。
 
-不在范围内：
+**已支持的能力面：**
 
-- ratatui 完整 widget 全家桶（Tabs/Table/Gauge/Sparkline/Chart/BarChart/Canvas/Calendar/Scrollbar 等都不实现）
-- cassowary 通用 Constraint solver（只支持 Length/Min/Percentage 三种）
-- bracketed paste / focus events / kitty keyboard protocol
-- 鼠标 drag/move 事件（只支持滚轮 + 单次 click）
-- Stylize trait 链式 API 全集（保留 `.fg() .bg() .style()` 三个）
+- 鼠标全协议：Down / Up / Moved / Drag / Wheel（SGR 1003h + 1006h）
+- 双层渲染：base buffer + overlay buffer + 自动 merge
+- Pointer capture + Interaction session + Esc 中断语义
+- Hover/Leave 检测 + Hit-test helper
+- Scrollbar 原语（track/thumb/drag/page）
+- 多行输入编辑器（grapheme-aware 光标 + MaxLines + 滚动）
+- CJK / emoji 双宽字符（纯 Pascal East Asian Width 表）
+- 4 个核心 widget（Block / Paragraph / List / Clear）+ 圆角边框
+- Layout solver（Length / Min / Percentage）
+- 性能：80×24 帧 191μs，mouse move 10μs/event
 
-详见 [`CLAUDE.md`](./CLAUDE.md)。
+**API 稳定性**：见 [`docs/api-stability.md`](./docs/api-stability.md)。
+**tui-design 迁移合同**：见 [`docs/tui-design-migration-profile.md`](./docs/tui-design-migration-profile.md)。
+**跨终端矩阵**：见 [`docs/terminal-capabilities.md`](./docs/terminal-capabilities.md)。
 
 ## 第一阶段公共面
 

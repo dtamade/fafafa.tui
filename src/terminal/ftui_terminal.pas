@@ -56,7 +56,8 @@ type
   // current buffer + cursor state.  Fields are public; widgets
   // call Buffer.SetString / Render directly.
   TFrame = record
-    Buffer: TBuffer;
+    Buffer: TBuffer;           // base buffer — write document/UI here
+    Overlay: TOverlayBuffer;   // overlay — write preview/cursor here
     Area: TRect;
     HasCursor: Boolean;
     CursorPos: TPosition;
@@ -65,16 +66,24 @@ type
   TTerminal = class
   private
     FBackend: TAnsiBackend;
-    FPrev, FCurr: TBuffer;
+    FPrev, FCurr, FMerged: TBuffer;
+    FOverlay: TOverlayBuffer;
     FFrame: TFrame;
     FInRawMode: Boolean;
     FSavedTermios: TermIOS;
     FInputQueue: array of Byte;
     FInputLen: Integer;
     FShouldQuit: Boolean;
+    FCapture: TPointerCapture;
+    FSession: TInteractionSession;
+    FPrevMousePos: TPosition;
+    FHasMouseTracking: Boolean;
+    FHasTruecolor: Boolean;
+    FHasKittyKeyboard: Boolean;
     function ReadAvailableBytes: Integer;
     procedure CheckSignals(out ResizeOut: TEvent; out HasResize: Boolean);
     procedure ResizeBuffersTo(W, H: Word);
+    procedure DetectCapabilities;
   public
     constructor Create;
     destructor Destroy; override;
@@ -102,11 +111,22 @@ type
 
     // The "current" rect, updated on resize.
     function Area: TRect;
+
+    // Pointer capture and interaction session (stable contract).
+    property Capture: TPointerCapture read FCapture write FCapture;
+    property Session: TInteractionSession read FSession write FSession;
+    property PrevMousePos: TPosition read FPrevMousePos write FPrevMousePos;
+
+    // Capability detection (stable contract).
+    property HasMouseTracking: Boolean read FHasMouseTracking;
+    property HasTruecolor: Boolean read FHasTruecolor;
+    property HasKittyKeyboard: Boolean read FHasKittyKeyboard;
   end;
 
 implementation
 
 uses
+  SysUtils,
   ftui_cell;
 
 // SIGWINCH flag.  Module-global because the signal handler needs C
@@ -150,15 +170,24 @@ begin
   FBackend := nil;
   FPrev := nil;
   FCurr := nil;
+  FMerged := nil;
+  FOverlay := nil;
   FInRawMode := False;
   FShouldQuit := False;
   FInputLen := 0;
+  FCapture.Release;
+  FSession.State := ssNone;
+  FHasMouseTracking := False;
+  FHasTruecolor := False;
+  FHasKittyKeyboard := False;
   SetLength(FInputQueue, 256);
 end;
 
 destructor TTerminal.Destroy;
 begin
   LeaveTui;
+  FOverlay.Free;
+  FMerged.Free;
   FCurr.Free;
   FPrev.Free;
   FBackend.Free;
@@ -191,6 +220,10 @@ begin
 
   FPrev := TBuffer.CreateEmpty(TRect.Make(0, 0, Sz.Cols, Sz.Rows));
   FCurr := TBuffer.CreateEmpty(TRect.Make(0, 0, Sz.Cols, Sz.Rows));
+  FMerged := TBuffer.CreateEmpty(TRect.Make(0, 0, Sz.Cols, Sz.Rows));
+  FOverlay := TOverlayBuffer.Create(TRect.Make(0, 0, Sz.Cols, Sz.Rows));
+  DetectCapabilities;
+  FHasMouseTracking := True;
   Result := True;
 end;
 
@@ -206,6 +239,8 @@ begin
     FBackend.Free;
     FBackend := nil;
   end;
+  if FOverlay <> nil then begin FOverlay.Free; FOverlay := nil; end;
+  if FMerged <> nil then begin FMerged.Free; FMerged := nil; end;
   if FCurr <> nil then begin FCurr.Free; FCurr := nil; end;
   if FPrev <> nil then begin FPrev.Free; FPrev := nil; end;
 
@@ -216,10 +251,10 @@ end;
 
 function TTerminal.BeginFrame: TFrame;
 begin
-  // Start every frame from a blank slate; consumer paints whatever it
-  // wants.  Diff against FPrev decides what actually goes to the wire.
   FCurr.Reset;
+  FOverlay.Clear;
   FFrame.Buffer := FCurr;
+  FFrame.Overlay := FOverlay;
   FFrame.Area := FCurr.Area;
   FFrame.HasCursor := False;
   FFrame.CursorPos.X := 0;
@@ -232,7 +267,20 @@ var
   Patches: TDiffEntries;
   Tmp: TBuffer;
 begin
-  FPrev.Diff(FCurr, Patches);
+  // Merge: copy base into merged, then apply overlay on top.
+  FMerged.Reset;
+  FOverlay.MergeInto(FCurr, FMerged);
+  // For cells not in overlay, copy from FCurr.
+  // (MergeInto only writes marked cells; we need the rest from base.)
+  // Simpler: just diff FCurr with overlay applied.
+  // Actually: MergeInto overwrites marked cells in Dest.  But Dest
+  // was Reset (all CellEmpty).  We need Dest = copy of FCurr first.
+  // Fix: copy FCurr into FMerged, then overlay on top.
+  Move(FCurr.CellAt(FCurr.Area.X, FCurr.Area.Y)^,
+       FMerged.CellAt(FMerged.Area.X, FMerged.Area.Y)^,
+       FCurr.Length_ * SizeOf(TCell));
+  FOverlay.MergeInto(FCurr, FMerged);
+  FPrev.Diff(FMerged, Patches);
   FBackend.DrawPatches(Patches);
   if F.HasCursor then
   begin
@@ -265,10 +313,21 @@ begin
   if FCurr <> nil then Result := FCurr.Area else Result := TRect.Make(0, 0, 0, 0);
 end;
 
+procedure TTerminal.DetectCapabilities;
+var CT, TP: AnsiString;
+begin
+  CT := GetEnvironmentVariable('COLORTERM');
+  TP := GetEnvironmentVariable('TERM_PROGRAM');
+  FHasTruecolor := (CT = 'truecolor') or (CT = '24bit');
+  FHasKittyKeyboard := (Pos('kitty', TP) > 0) or (Pos('WezTerm', TP) > 0) or (Pos('ghostty', TP) > 0);
+end;
+
 procedure TTerminal.ResizeBuffersTo(W, H: Word);
 begin
   if FPrev <> nil then FPrev.Resize(TRect.Make(0, 0, W, H));
   if FCurr <> nil then FCurr.Resize(TRect.Make(0, 0, W, H));
+  if FMerged <> nil then FMerged.Resize(TRect.Make(0, 0, W, H));
+  if FOverlay <> nil then FOverlay.Resize(TRect.Make(0, 0, W, H));
   // Force every cell to redraw on the next EndFrame.  Simplest way:
   // dirty FPrev so diff produces patches for everything.
   if FPrev <> nil then FPrev.Reset;
