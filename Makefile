@@ -18,6 +18,7 @@ UNIT_DIRS := \
 	$(TESTS_DIR)
 
 FPC_BASE_FLAGS := -MObjFPC -Sh -O3 -gl -CR -Xs
+FPC_BENCH_FLAGS := -MObjFPC -Sh -O3 -Xs
 FPC_UNIT_FLAGS := $(foreach d,$(UNIT_DIRS),-Fu$(d))
 FPC_LINK_FLAGS := -FE$(BIN_DIR)
 FPC_FLAGS := $(FPC_BASE_FLAGS) $(FPC_UNIT_FLAGS) $(FPC_LINK_FLAGS)
@@ -55,7 +56,7 @@ benchmarks:
 	@for f in $(BENCHMARKS_DIR)/*.lpr; do \
 		[ -e "$$f" ] || continue; \
 		echo ">> $$f"; \
-		$(FPC) $(FPC_FLAGS) $$f || exit $$?; \
+		$(FPC) $(FPC_BENCH_FLAGS) $(FPC_UNIT_FLAGS) $(FPC_LINK_FLAGS) $$f || exit $$?; \
 	done
 
 clean:

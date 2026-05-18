@@ -297,6 +297,7 @@ var
   Prev, Curr: PCell;
   Differs: Boolean;
   PosX, PosY: Word;
+{$PUSH}{$R-}{$Q-}    // hot loop: disable range/overflow checks
 begin
   // Buffers must share area dimensions; caller is responsible for
   // resizing before diffing.  Mismatched sizes degrade to "everything
@@ -338,7 +339,6 @@ begin
       Inc(OutCount);
     end;
 
-    // Counter updates — match ratatui semantics.
     if ToSkip > 0 then
       Dec(ToSkip)
     else
@@ -352,6 +352,7 @@ begin
   end;
 
   SetLength(Patches, OutCount);
+{$POP}
 end;
 
 function TBuffer.RowAsString(Y: Integer): AnsiString;

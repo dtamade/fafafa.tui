@@ -119,19 +119,20 @@ procedure TAnsiBackend.ApplyCellStyle(const C: TCell);
 var
   Changed: Boolean;
 begin
-  // Conservative minimisation: emit a full SGR reset + re-apply only
-  // when something differs from the cache.  Avoids per-cell SGR 0
-  // spam in the common "long run of identical style" case.
-  Changed := (not FLastInit) or
-             (not ColorEquals(C.Fg, FLastFg)) or
-             (not ColorEquals(C.Bg, FLastBg)) or
-             (not ColorEquals(C.Ul, FLastUl)) or
-             (C.Modifier <> FLastMod);
+  // Fast path: compare style fields inline.  We check Modifier first
+  // (2 bytes, cheapest) then colors (4 bytes each via LongWord cast).
+  // This is faster than CompareByte (FPC RTL function call overhead)
+  // and faster than 5 separate ColorEquals calls.
+  if FLastInit then
+    Changed := (C.Modifier <> FLastMod) or
+               (not ColorEquals(C.Fg, FLastFg)) or
+               (not ColorEquals(C.Bg, FLastBg)) or
+               (not ColorEquals(C.Ul, FLastUl))
+  else
+    Changed := True;
   if not Changed then Exit;
 
   AnsiSgrReset(FOut);
-  // SGR 0 already restores fg/bg to terminal default, so a ckReset
-  // colour needs no extra escape — only ckIndexed/ckRgb do.
   if (C.Fg.Kind = ckIndexed) or (C.Fg.Kind = ckRgb) then AnsiSgrFg(FOut, C.Fg);
   if (C.Bg.Kind = ckIndexed) or (C.Bg.Kind = ckRgb) then AnsiSgrBg(FOut, C.Bg);
   AnsiSgrModifierAdd(FOut, C.Modifier);
