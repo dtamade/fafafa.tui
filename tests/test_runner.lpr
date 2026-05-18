@@ -25,7 +25,9 @@ uses
   test_clear,
   test_block,
   test_paragraph,
-  test_list;
+  test_list,
+  test_input_parser,
+  test_terminal_smoke;
 
 var
   Failed: Integer;
@@ -46,6 +48,8 @@ begin
   RegisterBlockTests;
   RegisterParagraphTests;
   RegisterListTests;
+  RegisterInputParserTests;
+  RegisterTerminalSmokeTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

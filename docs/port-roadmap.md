@@ -100,11 +100,11 @@ cli888 主聊天界面骨架可拼。
 
 ### 判定标准
 
-- [ ] 32+ 个键码（含 Ctrl/Alt/Shift 修饰）解析单元测试通过
-- [ ] 滚轮 SGR mouse 解析正确
-- [ ] resize 事件能正确触发 buffer 重建
-- [ ] `examples/full_demo.lpr` 在 gnome-terminal、alacritty、wezterm 三种终端下行为一致
-- [ ] 退出 raw mode 时 termios 完整恢复（手动测试：跑完 demo 后 stty 没有副作用）
+- [x] 32+ 个键码（含 Ctrl/Alt/Shift 修饰）解析单元测试通过 — **20 测试覆盖 35+ 具体输入序列**（printable + 控制字 + Ctrl-letter + Alt+char + Alt+Enter + 双 ESC + 4 方向键 + Home/End + CSI ~ 6 种 + BackTab + 修饰键变体 + 12 个 F-keys + SS3 F1-F4 + SGR 鼠标滚轮上下 + LeftDown + 部分 CSI NeedMore + 无效 CSI Invalid）
+- [x] 滚轮 SGR mouse 解析正确 — `Test_MouseScroll` 验证 ScrollUp/Down 解出 1-based -> 0-based 坐标
+- [x] resize 事件能正确触发 buffer 重建 — TTerminal.CheckSignals 在 SIGWINCH 后调 ResizeBuffersTo，dirty FPrev 强制下一帧全屏重绘
+- [ ] `examples/full_demo.lpr` 在 gnome-terminal / alacritty / wezterm 行为一致 — **本机交互验证待用户跑**（编译通过，PTY boot 字节流验证 alt screen + 渲染正确）
+- [ ] 退出 raw mode 时 termios 完整恢复 — **本机交互验证待用户跑**（LeaveTui 通过 finally 块保证调用，TCSetAttr 用 TCSANOW 立即生效）
 
 ## M4 — 测试覆盖与基准（目标：1 周）
 
@@ -160,4 +160,11 @@ cli888 主聊天界面骨架可拼。
   - 35 个新 widget 测试，总 138/138，0 warning / 0 note
   - chat_mock.lpr：cli888 主聊天界面骨架可拼（标题栏 + List + 输入框 + 状态栏）
   - CJK 推迟到 M2.1（与 utf8proc 接入一起；widget 架构不会再改）
-- [ ] M2.1 / M3 待启动
+- [x] **M3 完成（2026-05-18）** ✅
+  - ftui_event / ftui_input_parser / ftui_termios / ftui_terminal
+  - 20 个 input parser 测试覆盖 35+ 输入序列（key + modifiers + 鼠标滚轮 + 边界）
+  - SIGWINCH 自动 resize buffer + 强制全帧重绘
+  - examples/full_demo.lpr：交互式 List 导航 + Enter 选中 + q/Esc 退出 + 滚轮 + resize
+  - 总测试 159/159，0 warning / 0 note
+  - 真机交互验证（gnome-terminal / alacritty / wezterm）+ termios 恢复确认留给用户跑
+- [ ] M4（基准 / 真实 cli888 dump 测试）/ M2.1（utf8proc CJK）待启动
