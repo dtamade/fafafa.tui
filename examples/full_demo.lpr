@@ -96,7 +96,7 @@ begin
   case M.Kind of
     mkScrollUp:   ListSt.Selected := ListSt.Selected - 1;
     mkScrollDown: ListSt.Selected := ListSt.Selected + 1;
-    mkLeftDown:   SetStatus(Format('clicked at (%d,%d)', [M.X, M.Y]));
+    mkDown:   SetStatus(Format('clicked at (%d,%d)', [M.X, M.Y]));
   end;
   ClampSelection;
 end;

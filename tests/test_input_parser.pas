@@ -234,7 +234,7 @@ begin
   // btn=0 with M (press) -> LeftDown
   ExpectMouse([27, Ord('['), Ord('<'), Ord('0'), Ord(';'),
                Ord('5'), Ord(';'), Ord('3'), Ord('M')],
-              mkLeftDown, 4, 2, 9, 'SGR left down at (5,3) -> (4,2)');
+              mkDown, 4, 2, 9, 'SGR left down at (5,3) -> (4,2)');
 end;
 
 procedure Test_PartialCsiNeedsMore;

@@ -102,11 +102,13 @@ procedure TAnsiBackend.ClearScreen;    begin AnsiClearScreen(FOut); end;
 procedure TAnsiBackend.EnterAlternate;
 begin
   AnsiEnterAltScreen(FOut);
+  AnsiEnableMouseTracking(FOut);
   ResetStyleCache;
 end;
 procedure TAnsiBackend.LeaveAlternate;
 begin
   AnsiSgrReset(FOut);
+  AnsiDisableMouseTracking(FOut);
   AnsiLeaveAltScreen(FOut);
   ResetStyleCache;
 end;

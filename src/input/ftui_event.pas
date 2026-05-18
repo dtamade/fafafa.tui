@@ -45,9 +45,12 @@ type
     Modifiers: TKeyModifiers;
   end;
 
-  TMouseEventKind = (mkScrollUp, mkScrollDown, mkLeftDown);
+  TMouseEventKind = (mkDown, mkUp, mkMoved, mkDrag, mkScrollUp, mkScrollDown);
+  TMouseButton = (mbLeft, mbMiddle, mbRight, mbNone);
+
   TMouseEvent = packed record
     Kind: TMouseEventKind;
+    Button: TMouseButton;
     X, Y: Word;
     Modifiers: TKeyModifiers;
   end;
@@ -68,7 +71,7 @@ function NoneEvent: TEvent; inline;
 function KeyCharEvent(Ch: LongWord; Mods: TKeyModifiers): TEvent;
 function KeyCodeEvent(Code: TKeyCodeKind; Mods: TKeyModifiers): TEvent;
 function KeyFunctionEvent(F: Byte; Mods: TKeyModifiers): TEvent;
-function MouseEvent(Kind: TMouseEventKind; X, Y: Word; Mods: TKeyModifiers): TEvent;
+function MouseEvent(Kind: TMouseEventKind; Btn: TMouseButton; X, Y: Word; Mods: TKeyModifiers): TEvent;
 function ResizeEvent(W, H: Word): TEvent;
 
 implementation
@@ -105,11 +108,12 @@ begin
   Result.Key.Modifiers := Mods;
 end;
 
-function MouseEvent(Kind: TMouseEventKind; X, Y: Word; Mods: TKeyModifiers): TEvent;
+function MouseEvent(Kind: TMouseEventKind; Btn: TMouseButton; X, Y: Word; Mods: TKeyModifiers): TEvent;
 begin
   FillChar(Result, SizeOf(Result), 0);
   Result.Kind := evMouse;
   Result.Mouse.Kind := Kind;
+  Result.Mouse.Button := Btn;
   Result.Mouse.X := X;
   Result.Mouse.Y := Y;
   Result.Mouse.Modifiers := Mods;

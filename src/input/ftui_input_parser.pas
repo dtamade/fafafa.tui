@@ -137,24 +137,66 @@ begin
     Inc(Pos);
     IsRelease := Final = Ord('m');
     Consumed := Pos;
-    // Mouse button encoding:
-    //   0   = left, 1 = middle, 2 = right
-    //   64  = scroll up, 65 = scroll down
-    //   bit 4 (16) = ctrl, bit 3 (8) = alt, bit 2 (4) = shift
+    // SGR mouse button encoding:
+    //   bits 0-1: button (0=left, 1=middle, 2=right, 3=release/none)
+    //   bit 2 (4): shift
+    //   bit 3 (8): alt/meta
+    //   bit 4 (16): ctrl
+    //   bit 5 (32): motion (drag or move)
+    //   bits 6-7 (64,128): 64=scroll up, 65=scroll down
     Mods := [];
     if (Param1 and 4)  <> 0 then Include(Mods, kmShift);
     if (Param1 and 8)  <> 0 then Include(Mods, kmAlt);
     if (Param1 and 16) <> 0 then Include(Mods, kmCtrl);
-    case Param1 and not 28 of           // mask out modifier bits
-      64: Out_ := MouseEvent(mkScrollUp,   Word(Param2 - 1), Word(Param3 - 1), Mods);
-      65: Out_ := MouseEvent(mkScrollDown, Word(Param2 - 1), Word(Param3 - 1), Mods);
-      0:
-        if IsRelease then
-          Exit(prInvalid)               // we don't model release events
+
+    B := Param1 and 3;       // button bits
+    if (Param1 and 64) <> 0 then
+    begin
+      // Scroll events.
+      if B = 0 then
+        Out_ := MouseEvent(mkScrollUp, mbNone, Word(Param2 - 1), Word(Param3 - 1), Mods)
+      else
+        Out_ := MouseEvent(mkScrollDown, mbNone, Word(Param2 - 1), Word(Param3 - 1), Mods);
+    end
+    else if (Param1 and 32) <> 0 then
+    begin
+      // Motion event (bit 5 set).
+      // If button bits = 3, it's a pure move (no button held).
+      // Otherwise it's a drag with that button held.
+      if B = 3 then
+        Out_ := MouseEvent(mkMoved, mbNone, Word(Param2 - 1), Word(Param3 - 1), Mods)
+      else
+      begin
+        case B of
+          0: Out_ := MouseEvent(mkDrag, mbLeft,   Word(Param2 - 1), Word(Param3 - 1), Mods);
+          1: Out_ := MouseEvent(mkDrag, mbMiddle, Word(Param2 - 1), Word(Param3 - 1), Mods);
+          2: Out_ := MouseEvent(mkDrag, mbRight,  Word(Param2 - 1), Word(Param3 - 1), Mods);
         else
-          Out_ := MouseEvent(mkLeftDown, Word(Param2 - 1), Word(Param3 - 1), Mods);
+          Out_ := MouseEvent(mkDrag, mbLeft, Word(Param2 - 1), Word(Param3 - 1), Mods);
+        end;
+      end;
+    end
+    else if IsRelease then
+    begin
+      // Button release.
+      case B of
+        0: Out_ := MouseEvent(mkUp, mbLeft,   Word(Param2 - 1), Word(Param3 - 1), Mods);
+        1: Out_ := MouseEvent(mkUp, mbMiddle, Word(Param2 - 1), Word(Param3 - 1), Mods);
+        2: Out_ := MouseEvent(mkUp, mbRight,  Word(Param2 - 1), Word(Param3 - 1), Mods);
+      else
+        Out_ := MouseEvent(mkUp, mbLeft, Word(Param2 - 1), Word(Param3 - 1), Mods);
+      end;
+    end
     else
-      Exit(prInvalid);
+    begin
+      // Button press.
+      case B of
+        0: Out_ := MouseEvent(mkDown, mbLeft,   Word(Param2 - 1), Word(Param3 - 1), Mods);
+        1: Out_ := MouseEvent(mkDown, mbMiddle, Word(Param2 - 1), Word(Param3 - 1), Mods);
+        2: Out_ := MouseEvent(mkDown, mbRight,  Word(Param2 - 1), Word(Param3 - 1), Mods);
+      else
+        Out_ := MouseEvent(mkDown, mbLeft, Word(Param2 - 1), Word(Param3 - 1), Mods);
+      end;
     end;
     Result := prSuccess;
     Exit;

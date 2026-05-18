@@ -28,6 +28,8 @@ procedure AnsiMoveTo          (var B: TByteBuilder; X, Y: Word); // 0-based in
 procedure AnsiClearScreen     (var B: TByteBuilder); inline;
 procedure AnsiEnterAltScreen  (var B: TByteBuilder); inline;
 procedure AnsiLeaveAltScreen  (var B: TByteBuilder); inline;
+procedure AnsiEnableMouseTracking(var B: TByteBuilder);
+procedure AnsiDisableMouseTracking(var B: TByteBuilder);
 
 // Style emitters.  Each one writes a fully-formed SGR sequence and
 // resets nothing; backends are expected to call AnsiSgrReset between
@@ -90,6 +92,29 @@ begin
   B.AppendByte(27); B.AppendByte(Ord('['));
   B.AppendByte(Ord('?'));
   B.AppendByte(Ord('1')); B.AppendByte(Ord('0')); B.AppendByte(Ord('4')); B.AppendByte(Ord('9'));
+  B.AppendByte(Ord('l'));
+end;
+
+procedure AnsiEnableMouseTracking(var B: TByteBuilder);
+begin
+  // CSI ?1003h = any-event tracking (reports move even without button)
+  B.AppendByte(27); B.AppendByte(Ord('['));
+  B.AppendByte(Ord('?')); B.AppendByte(Ord('1')); B.AppendByte(Ord('0')); B.AppendByte(Ord('0')); B.AppendByte(Ord('3'));
+  B.AppendByte(Ord('h'));
+  // CSI ?1006h = SGR encoding (supports coordinates > 223)
+  B.AppendByte(27); B.AppendByte(Ord('['));
+  B.AppendByte(Ord('?')); B.AppendByte(Ord('1')); B.AppendByte(Ord('0')); B.AppendByte(Ord('0')); B.AppendByte(Ord('6'));
+  B.AppendByte(Ord('h'));
+end;
+
+procedure AnsiDisableMouseTracking(var B: TByteBuilder);
+begin
+  // CSI ?1003l + CSI ?1006l
+  B.AppendByte(27); B.AppendByte(Ord('['));
+  B.AppendByte(Ord('?')); B.AppendByte(Ord('1')); B.AppendByte(Ord('0')); B.AppendByte(Ord('0')); B.AppendByte(Ord('3'));
+  B.AppendByte(Ord('l'));
+  B.AppendByte(27); B.AppendByte(Ord('['));
+  B.AppendByte(Ord('?')); B.AppendByte(Ord('1')); B.AppendByte(Ord('0')); B.AppendByte(Ord('0')); B.AppendByte(Ord('6'));
   B.AppendByte(Ord('l'));
 end;
 
