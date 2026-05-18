@@ -33,7 +33,7 @@ end;
 
 ### 键盘事件
 
-保持现有 `TKeyEvent` 不变。CSI u (kitty protocol) 已支持 Shift+Enter 等修饰键区分。
+保持现有 `TKeyEvent` 不变。CSI u (kitty protocol) parser 能解析。注意：fafafa.tui 不主动发送 CSI > 1u 启用序列——依赖终端自身默认行为或用户配置。
 
 ### Esc 合同
 
@@ -99,12 +99,12 @@ TTerminal.Capture.Active: Boolean;            // 查询状态
 ## 4. Hover/Leave 合同
 
 ```pascal
-TTerminal.PrevMousePos: TPosition;            // 上一条鼠标事件的最终坐标（PollEvent 返回前自动更新）
+TTerminal.PrevMousePos: TPosition;  // 上一次 PollEvent 返回的鼠标事件坐标
 ```
 
 **消费方判断逻辑**：
-- Enter = 上一条事件的 PrevMousePos 不在区域内 + 当前事件坐标在区域内
-- Leave = 上一条事件的 PrevMousePos 在区域内 + 当前事件坐标不在区域内
+- Enter = PrevMousePos（上次事件坐标）不在区域内 + 当前 Event.Mouse.X/Y 在区域内
+- Leave = PrevMousePos（上次事件坐标）在区域内 + 当前 Event.Mouse.X/Y 不在区域内
 - Stay = 两帧都在区域内
 
 **fafafa.tui 提供的 helper**：

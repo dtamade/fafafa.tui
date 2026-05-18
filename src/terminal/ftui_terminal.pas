@@ -77,6 +77,7 @@ type
     FCapture: TPointerCapture;
     FSession: TInteractionSession;
     FPrevMousePos: TPosition;
+    FLastMousePos: TPosition;  // staging: updated in PostProcess, promoted to Prev at next PollEvent start
     FHasMouseTracking: Boolean;
     FHasTruecolor: Boolean;
     FHasKittyKeyboard: Boolean;
@@ -385,8 +386,8 @@ begin
         //   4. Next PollEvent → consumer compares new event vs PrevMousePos
         // This means PrevMousePos = "coords of the LAST event", which is
         // exactly what DetectHoverChange needs (compare prev vs curr).
-        FPrevMousePos.X := Ev.Mouse.X;
-        FPrevMousePos.Y := Ev.Mouse.Y;
+        FLastMousePos.X := Ev.Mouse.X;
+        FLastMousePos.Y := Ev.Mouse.Y;
         // Auto-release capture on MouseUp.
         if (Ev.Mouse.Kind = mkUp) and FCapture.Active then
         begin
@@ -412,6 +413,10 @@ var
   Resz: TEvent;
   ParsedBytes: Integer;
 begin
+  // Promote last mouse coords to PrevMousePos at the start of each poll.
+  // This ensures that when the consumer reads PrevMousePos after PollEvent
+  // returns, it sees the PREVIOUS event's coords (not the current one).
+  FPrevMousePos := FLastMousePos;
   Result := NoneEvent;
 
   // 1. Drain pending bytes already in the queue first — typing fast

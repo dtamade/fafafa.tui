@@ -11,7 +11,7 @@ fafafa.tui 依赖的终端能力及各终端支持情况。
 | Any-event tracking | CSI ?1003h/l | MouseMoved 不需要按钮 |
 | Button-event tracking | CSI ?1002h/l | MouseDrag（按住移动） |
 | Normal tracking | CSI ?1000h/l | 基础 click + release |
-| Kitty keyboard | CSI > 1u / CSI < u | Shift+Enter 区分 |
+| Kitty keyboard | CSI > 1u / CSI < u | Shift+Enter 区分（parser 能解析，不主动启用） |
 | Truecolor (24-bit) | SGR 38;2;r;g;b | RGB 颜色 |
 | 256-color | SGR 38;5;n | 索引颜色 |
 | Bold/Italic/Underline | SGR 1/3/4 | 文本修饰 |

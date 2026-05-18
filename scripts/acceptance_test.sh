@@ -123,10 +123,12 @@ else
   fi
 fi
 
-# Test 6: Terminal restored (check stty is sane).
-# After tmux session ends, our terminal should be fine.
-# If raw mode leaked, 'stty' would show '-echo' or similar.
-STTY_OUT=$(stty 2>/dev/null || echo "")
+# Test 6: Terminal restored — run stty inside a fresh tmux pane to verify
+# the demo didn't leak raw mode into the PTY layer.
+tmux new-session -d -s "${SESSION}_check" -x 80 -y 24 "stty; sleep 1"
+sleep 0.5
+STTY_OUT=$(tmux capture-pane -t "${SESSION}_check" -p 2>/dev/null || echo "")
+tmux kill-session -t "${SESSION}_check" 2>/dev/null || true
 if echo "$STTY_OUT" | grep -q "\-echo"; then
   echo "  FAIL  terminal not restored (raw mode leaked)"
   ((FAIL++))

@@ -45,7 +45,7 @@ var
   Overlay: TOverlayBuffer;
   Capture: TPointerCapture;
   Session: TInteractionSession;
-  PrevMX, PrevMY: Word;
+  LastMouseX, LastMouseY: Word;
   DragStartX, DragStartY: Integer;
   CanvasArea: TRect;
 
@@ -130,9 +130,9 @@ begin
     TStyle.Default.WithFg(clDarkGray));
 
   // Show cursor position.
-  if HitTest(CanvasArea, PrevMX, PrevMY) then
+  if HitTest(CanvasArea, LastMouseX, LastMouseY) then
     Frame.Buffer.SetStringN(StatusArea.X + StatusArea.Width - 12, StatusArea.Y,
-      Format('(%d,%d)', [PrevMX, PrevMY]), 12, TStyle.Default.WithFg(clCyan));
+      Format('(%d,%d)', [LastMouseX, LastMouseY]), 12, TStyle.Default.WithFg(clCyan));
 
   Term.EndFrame(Frame);
 end;
@@ -140,7 +140,8 @@ end;
 procedure HandleMouse(const M: TMouseEvent);
 var HC: THoverChange;
 begin
-  HC := DetectHoverChange(CanvasArea, PrevMX, PrevMY, M.X, M.Y);
+  LastMouseX := M.X; LastMouseY := M.Y;
+  HC := DetectHoverChange(CanvasArea, Term.PrevMousePos.X, Term.PrevMousePos.Y, M.X, M.Y);
 
   case M.Kind of
     mkMoved:
@@ -177,8 +178,8 @@ begin
   else
   end;
 
-  PrevMX := M.X;
-  PrevMY := M.Y;
+  LastMouseX := M.X;
+  LastMouseY := M.Y;
 end;
 
 procedure HandleKey(const K: TKeyEvent);
@@ -212,7 +213,6 @@ begin
     Overlay := TOverlayBuffer.Create(Term.Area);
     Capture.Release;
     Session.State := ssNone;
-    PrevMX := 0; PrevMY := 0;
     DragStartX := 0; DragStartY := 0;
 
     InitCanvas;
