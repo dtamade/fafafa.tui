@@ -31,10 +31,17 @@ ftui_terminal  TTerminal / TFrame + ANSI backend + TestBackend + 输入解析
 - Padding 类型（cli888 直接用 Rect 减）
 - Constraint::Max / Ratio / Fill / Length+Min 复杂混用
 - Margin 类型（直接用 Rect 减）
-- Bracketed paste / Focus events / Kitty keyboard protocol
-- Mouse drag / move（只解析滚轮 + 单次 click 坐标）
+- Bracketed paste / Focus events（不在当前路线图）
 - Stylize trait 全集（保留 fg/bg/style 三个，bold 等展开成 add_modifier）
 - Title alignment（cli888 几乎只用 left）
+
+**已扩展到编辑器交互 profile（v0.8.0-rc 起）：**
+- 鼠标全协议：Down / Up / Moved / Drag / Wheel（SGR 1003h + 1006h）
+- 双层渲染：TFrame.Buffer (base) + TFrame.Overlay (preview)
+- Pointer capture + Interaction session + Esc 中断
+- Scrollbar 原语 + Hit-test + Hover/Leave 检测
+- 能力检测：HasMouseTracking / HasTruecolor / HasKittyKeyboard
+- CSI u (kitty keyboard protocol) 支持 Shift+Enter 等修饰键区分
 
 ### 范围扩展规则
 
@@ -45,9 +52,8 @@ ftui_terminal  TTerminal / TFrame + ANSI backend + TestBackend + 输入解析
 
 只有 (1) ≥ 5 处且 (2) ≥ 3 倍代码量时，才允许新增。否则维持冻结。
 
-直到 fafafa.tui 至少有 **2 个独立 consumer 项目**之前，**禁止**做以下任何一项：
+已有 2 个独立消费方（cli888-pascal + tui-design），以下限制已解除：
 
-- public API contract 锁定
 - 多 widget 形态
 - "未来 consumer"为动机的预留设计
 - SDK / package / 分发机制

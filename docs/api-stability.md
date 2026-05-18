@@ -38,6 +38,7 @@
 | `ftui_interaction` | TPointerCapture / TInteractionSession / HitTest / HoverChange | 接口可能扩展 |
 | `ftui_overlay` | TOverlayBuffer + MergeInto | merge 策略可能加 alpha |
 | `ftui_scrollbar` | TScrollbar + Render/HitAt/OffsetFromDragY | 可能加水平方向 |
+| `ftui_terminal` | TTerminal + TFrame (overlay/capture/session) | 接口稳定，内部实现可能优化 |
 | `ftui_theme` | TTheme + ThemeDefaultDark | 字段可能增减 |
 
 ### internal（不应直接依赖）
@@ -49,7 +50,7 @@
 | `ftui_ansi_backend` | TAnsiBackend — Terminal 内部使用 |
 | `ftui_test_backend` | TTestBackend — 仅测试用 |
 | `ftui_termios` | termios 绑定 — Terminal 内部 |
-| `ftui_terminal` | TTerminal — 可能重构为支持 overlay |
+| `ftui_terminal` | TTerminal — 重构完成，overlay/capture/session 已集成 |
 | `ftui_input_parser` | ParseOne — Terminal 内部使用 |
 
 ## 版本承诺

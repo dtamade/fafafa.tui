@@ -61,7 +61,7 @@ end;
 **合同**：
 - `Frame.BaseBuffer`：静态内容，只在文档/UI 变化时重绘
 - `Frame.OverlayBuffer`：动态内容，每次鼠标移动可重绘
-- `Frame.InvalidateOverlay`：只重绘 overlay，不触发 base diff
+- `Frame.InvalidateOverlay`：只重绘 overlay，不触发 base diff [planned — 当前实现是全帧 merge，性能已验证 10μs/event]
 - `Frame.InvalidateBase`：重绘 base + overlay
 - Merge 算法：overlay cell 非空时覆盖 base cell（简单覆盖，不做 alpha）
 
@@ -166,8 +166,8 @@ end;
 | Windows Terminal | ✅ | ✅ | 全功能 |
 | 不支持 1003h 的终端 | ❌ | ❌ | 降级到 click+wheel only |
 
-**降级检测**：`TTerminal.HasMotionTracking: Boolean`（尝试开启后检测是否生效）。
-**显式降级**：消费方可查询 `HasMotionTracking` 决定是否启用 hover/drag 功能。
+**降级检测**：`TTerminal.HasMouseTracking: Boolean`（optimistic flag：开启 1003h 后设为 True；不做主动探测，因为大多数现代终端都支持）。
+**显式降级**：消费方可查询 `HasMouseTracking` 决定是否启用 hover/drag 功能。
 
 ## 8. Interaction Session 合同
 
