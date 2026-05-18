@@ -1,18 +1,29 @@
 program cli888_demo;
 
-// cli888-faithful TUI demo.  Pixel-perfect reproduction of the real
-// cli888 chat interface based on source analysis of:
-//   - src/tui/chat/theme/presets.rs (DefaultDark RGB values)
-//   - src/tui/chat/theme/symbols.rs (indicators: > ◆ ▸ ●)
-//   - src/tui/chat/message/{user,assistant,tool,thinking}.rs
-//   - src/tui/chat/layout/{status_bar,bottom_pane,borders}.rs
-//   - src/tui/chat/widgets/{input_box,message_list,spinner}.rs
+// cli888-faithful TUI demo — bottom-pane architecture.
 //
-// Layout (top to bottom):
-//   [messages area]     — flex, direct buffer paint, per-role styling
-//   [input box]         — rounded border, dynamic height, placeholder
-//   [status row 1]      — CWD left, model right
-//   [status row 2]      — hints left, state+spinner right
+// Layout matches cli888 exactly:
+//
+//   ┌─ terminal ──────────────────────────────┐
+//   │                                         │
+//   │  Messages area (flex height)            │
+//   │   > user message                        │
+//   │   ◆ ai response                         │
+//   │   ▸ tool call                           │
+//   │                                         │
+//   ╭─────────────────────────────────────────╮  <- bottom pane top border
+//   │ [host: tool status / slash menu]        │  <- host surface (0-8 lines)
+//   ├─────────────────────────────────────────┤  <- separator
+//   │ > input text_                           │  <- input surface (1-4 lines)
+//   ├─────────────────────────────────────────┤  <- separator
+//   │ ~/projects/fafafa.tui   claude-opus-4-7 │  <- status surface line 1
+//   │ Enter send  /cmds       State: Idle     │  <- status surface line 2
+//   ╰─────────────────────────────────────────╯  <- bottom pane bottom border
+//
+// The bottom pane is a "box" with rounded corners.  Its height is
+// dynamic: host surface expands when slash menu / tool status is
+// active, input grows with multi-line content.  Messages area
+// shrinks to accommodate.
 
 {$mode objfpc}{$H+}
 
@@ -37,39 +48,40 @@ uses
 
 const
   MAX_MSGS = 300;
+  SYM_USER   = '>';
+  SYM_AI     = #$E2#$97#$86;       // ◆
+  SYM_TOOL   = #$E2#$96#$B8;       // ▸
+  SYM_SYSTEM = #$E2#$97#$8F;       // ●
+  SYM_CHECK  = #$E2#$9C#$93;       // ✓
+  SYM_THINK  = #$F0#$9F#$92#$AD;   // 💭
+  PLACEHOLDER = 'Type a message... (/ for commands)';
 
-  // cli888 symbols (from theme/symbols.rs).
-  SYM_USER    = '>';                           // user indicator
-  SYM_AI      = #$E2#$97#$86;                 // ◆
-  SYM_TOOL    = #$E2#$96#$B8;                 // ▸
-  SYM_SYSTEM  = #$E2#$97#$8F;                 // ●
-  SYM_CHECK   = #$E2#$9C#$93;                 // ✓
-  SYM_CROSS   = #$E2#$9C#$97;                 // ✗
-  SYM_THINK   = #$F0#$9F#$92#$AD;             // 💭
-
-  // Spinner frames (10-frame braille, 80ms interval).
   SPINNER: array[0..9] of AnsiString = (
     #$E2#$A0#$8B, #$E2#$A0#$99, #$E2#$A0#$B9, #$E2#$A0#$B8,
     #$E2#$A0#$BC, #$E2#$A0#$B4, #$E2#$A0#$A6, #$E2#$A0#$A7,
-    #$E2#$A0#$87, #$E2#$A0#$8F
-  );
+    #$E2#$A0#$87, #$E2#$A0#$8F);
+
+  SLASH_CMDS: array[0..4, 0..1] of AnsiString = (
+    ('help',    'Show available commands'),
+    ('clear',   'Clear message history'),
+    ('model',   'Switch AI model'),
+    ('compact', 'Toggle compact mode'),
+    ('quit',    'Exit cli888'));
 
   AI_RESPONSES: array[0..4] of AnsiString = (
-    'I can help with that! Let me look into the codebase and find what you need.',
-    'Here''s what I found: the function is defined in `src/main.pas` at line 42. It takes two parameters and returns an integer result.',
-    'Sure, I''ll read that file for you.' + #10 + #10 + '```pascal' + #10 + 'program hello;' + #10 + 'begin' + #10 + '  WriteLn(''hello world'');' + #10 + 'end.' + #10 + '```' + #10 + #10 + 'The file is 4 lines long.',
-    #$E8#$BF#$99#$E6#$98#$AF#$E4#$B8#$AD#$E6#$96#$87#$E5#$9B#$9E#$E5#$A4#$8D + ', mixed with English and emoji ' + #$F0#$9F#$98#$80 + '!',
-    'Done! Here''s a summary:' + #10 + '  - Modified 3 files' + #10 + '  - Added 42 lines' + #10 + '  - Removed 7 lines' + #10 + '  - All tests passing ' + SYM_CHECK
-  );
+    'I can help with that! Let me look into the codebase.',
+    'Here''s what I found: the function is in `src/main.pas` at line 42.',
+    'Sure, I''ll read that file.' + #10 + #10 + '```pascal' + #10 + 'program hello;' + #10 + 'begin' + #10 + '  WriteLn(''hello'');' + #10 + 'end.' + #10 + '```',
+    #$E8#$BF#$99#$E6#$98#$AF#$E4#$B8#$AD#$E6#$96#$87 + ', with English and ' + #$F0#$9F#$98#$80 + '!',
+    'Done! Summary:' + #10 + '  - Modified 3 files' + #10 + '  - Added 42 lines' + #10 + '  - All tests passing ' + SYM_CHECK);
 
 type
   TMsgRole = (mrUser, mrAI, mrTool, mrSystem, mrThinking);
-  TAppState = (asIdle, asThinking, asStreaming, asPalette);
+  TAppState = (asIdle, asThinking, asStreaming, asSlashMenu);
 
   TMsg = record
     Role: TMsgRole;
     Content: AnsiString;
-    ToolName: AnsiString;
     ToolDone: Boolean;
   end;
 
@@ -83,65 +95,24 @@ var
   State: TAppState;
   StreamIdx, StreamRevealed: Integer;
   StreamTarget: AnsiString;
-  ThinkTick: Integer;
-  SpinnerTick: Integer;
+  ThinkTick, SpinnerTick: Integer;
   ScrollOffset: Integer;
-  ResponseIdx: Integer;
-  TokenCount: Integer;
+  ResponseIdx, TokenCount: Integer;
   ModelName, CwdPath: AnsiString;
+  SlashMenuSel: Integer;
+  SlashMenuFilter: AnsiString;
+  ToolStatusLine: AnsiString;
 
-procedure AddMsg(Role: TMsgRole; const Content: AnsiString; const Tool: AnsiString = '');
+// === Helpers ===
+
+procedure AddMsg(Role: TMsgRole; const Content: AnsiString);
 begin
   if MsgCount >= MAX_MSGS then Exit;
   Msgs[MsgCount].Role := Role;
   Msgs[MsgCount].Content := Content;
-  Msgs[MsgCount].ToolName := Tool;
-  Msgs[MsgCount].ToolDone := False;
+  Msgs[MsgCount].ToolDone := (Role = mrTool);
   Inc(MsgCount);
   ScrollOffset := 0;
-end;
-
-procedure StartResponse;
-begin
-  State := asThinking;
-  ThinkTick := 0;
-  AddMsg(mrThinking, 'Analyzing request...');
-end;
-
-procedure AdvanceThinking;
-begin
-  Inc(ThinkTick);
-  Inc(SpinnerTick);
-  if ThinkTick >= 30 then
-  begin
-    // Remove thinking message.
-    Dec(MsgCount);
-    // Simulate tool call every other response.
-    if (ResponseIdx mod 2) = 0 then
-    begin
-      AddMsg(mrTool, 'Read src/main.pas (4 lines)', 'Read');
-      Msgs[MsgCount - 1].ToolDone := True;
-    end;
-    StreamTarget := AI_RESPONSES[ResponseIdx mod Length(AI_RESPONSES)];
-    Inc(ResponseIdx);
-    StreamRevealed := 0;
-    StreamIdx := MsgCount;
-    AddMsg(mrAI, '');
-    State := asStreaming;
-    Inc(TokenCount, Length(StreamTarget) div 4);
-  end;
-end;
-
-procedure AdvanceStream;
-begin
-  Inc(SpinnerTick);
-  if StreamRevealed < Length(StreamTarget) then
-  begin
-    Inc(StreamRevealed);
-    Msgs[StreamIdx].Content := Copy(StreamTarget, 1, StreamRevealed);
-  end
-  else
-    State := asIdle;
 end;
 
 function Ucs4ToUtf8(Cp: LongWord): AnsiString;
@@ -154,11 +125,7 @@ end;
 
 function ColToByteOfs(const S: AnsiString; Col: Integer): Integer;
 var P, C: Integer; Adv: TGraphemeAdvance;
-begin
-  P := 0; C := 0;
-  while (P < Length(S)) and (C < Col) do begin Adv := GraphemeAdvance(S[1], Length(S), P); Inc(P, Adv.ByteLen); Inc(C, Adv.Width); end;
-  Result := P;
-end;
+begin P := 0; C := 0; while (P < Length(S)) and (C < Col) do begin Adv := GraphemeAdvance(S[1], Length(S), P); Inc(P, Adv.ByteLen); Inc(C, Adv.Width); end; Result := P; end;
 
 procedure InsertInput(Cp: LongWord);
 var S: AnsiString; B: Integer;
@@ -174,293 +141,280 @@ begin
   if InputCurCol < 0 then InputCurCol := 0;
 end;
 
+procedure StartResponse;
+begin State := asThinking; ThinkTick := 0; ToolStatusLine := ''; AddMsg(mrThinking, 'Analyzing...'); end;
+
+procedure AdvanceThinking;
+begin
+  Inc(ThinkTick); Inc(SpinnerTick);
+  ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' Thinking...';
+  if ThinkTick >= 25 then begin
+    Dec(MsgCount);
+    if (ResponseIdx mod 2) = 0 then begin
+      ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' ' + SYM_TOOL + ' Read src/main.pas';
+      AddMsg(mrTool, 'Read src/main.pas ' + SYM_CHECK);
+    end;
+    StreamTarget := AI_RESPONSES[ResponseIdx mod Length(AI_RESPONSES)];
+    Inc(ResponseIdx); StreamRevealed := 0; StreamIdx := MsgCount;
+    AddMsg(mrAI, ''); State := asStreaming;
+    Inc(TokenCount, Length(StreamTarget) div 4);
+    ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' Streaming';
+  end;
+end;
+
+procedure AdvanceStream;
+begin
+  Inc(SpinnerTick);
+  ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' Streaming';
+  if StreamRevealed < Length(StreamTarget) then begin
+    Inc(StreamRevealed);
+    Msgs[StreamIdx].Content := Copy(StreamTarget, 1, StreamRevealed);
+  end else begin State := asIdle; ToolStatusLine := ''; end;
+end;
+
 procedure SendMessage;
 begin
   if Length(InputBuf) = 0 then Exit;
   AddMsg(mrUser, InputBuf);
   Inc(TokenCount, Length(InputBuf) div 4);
-  if InputBuf = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /quit  |  Ctrl+P palette  |  Ctrl+C quit')
+  if InputBuf = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /compact /quit')
   else if InputBuf = '/clear' then MsgCount := 0
   else if InputBuf = '/quit' then Term.RequestQuit
   else StartResponse;
   InputBuf := ''; InputCurCol := 0;
 end;
 
-// Render one message line into the buffer at (X, Y) with full width W.
-// Returns the number of rows consumed (1 for single-line, more for wrapped AI).
+// === Rendering ===
+
+procedure RenderSeparator(Buf: TBuffer; X, Y, W: Integer);
+var I: Integer;
+begin
+  Buf.SetStringN(X, Y, BorderLeftT, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  for I := X + 1 to X + W - 2 do
+    Buf.SetStringN(I, Y, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Buf.SetStringN(X + W - 1, Y, BorderRightT, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+end;
+
 function RenderMessage(Buf: TBuffer; const M: TMsg; X, Y, W: Integer): Integer;
 var
   Indicator: AnsiString;
   IndSty, ContentSty, BgSty: TStyle;
-  I, ContentStart, SliceStart: Integer;
+  I, ContentCol, SliceStart, LineCount_: Integer;
   Lines: array of AnsiString;
-  LineCount_: Integer;
 begin
   Result := 0;
   if W <= 4 then Exit;
-
   case M.Role of
-    mrUser: begin
-      Indicator := ' ' + SYM_USER + ' ';
-      IndSty := Theme.UserLabel;
-      ContentSty := Theme.PrimaryText;
-      BgSty := TStyle.Default.WithBg(Theme.BgPrimary);
-    end;
-    mrAI: begin
-      Indicator := ' ' + SYM_AI + ' ';
-      IndSty := Theme.AiLabel;
-      ContentSty := TStyle.Default.WithFg(Theme.FgPrimary);
-      BgSty := TStyle.Default.WithBg(Theme.BgAiMsg);
-    end;
-    mrTool: begin
-      Indicator := '  ' + SYM_TOOL + ' ';
-      IndSty := Theme.ToolLabel;
-      if M.ToolDone then
-        ContentSty := TStyle.Default.WithFg(Theme.StatusSuccess)
-      else
-        ContentSty := TStyle.Default.WithFg(Theme.AccentTool);
-      BgSty := TStyle.Default.WithBg(Theme.BgPrimary);
-    end;
-    mrSystem: begin
-      Indicator := ' ' + SYM_SYSTEM + ' ';
-      IndSty := Theme.SystemLabel;
-      ContentSty := TStyle.Default.WithFg(Theme.AccentBrand);
-      BgSty := TStyle.Default.WithBg(Theme.BgSystem);
-    end;
-    mrThinking: begin
-      Indicator := ' ' + SYM_THINK + ' ';
-      IndSty := Theme.InfoLabel;
-      ContentSty := Theme.MutedText;
-      BgSty := TStyle.Default.WithBg(Theme.BgThinking);
-    end;
+    mrUser:    begin Indicator := ' ' + SYM_USER + ' '; IndSty := Theme.UserLabel; ContentSty := Theme.PrimaryText; BgSty := TStyle.Default.WithBg(Theme.BgPrimary); end;
+    mrAI:      begin Indicator := ' ' + SYM_AI + ' '; IndSty := Theme.AiLabel; ContentSty := TStyle.Default.WithFg(Theme.FgPrimary); BgSty := TStyle.Default.WithBg(Theme.BgAiMsg); end;
+    mrTool:    begin Indicator := '  ' + SYM_TOOL + ' '; IndSty := Theme.ToolLabel; ContentSty := TStyle.Default.WithFg(Theme.StatusSuccess); BgSty := TStyle.Default.WithBg(Theme.BgPrimary); end;
+    mrSystem:  begin Indicator := ' ' + SYM_SYSTEM + ' '; IndSty := Theme.SystemLabel; ContentSty := TStyle.Default.WithFg(Theme.AccentBrand); BgSty := TStyle.Default.WithBg(Theme.BgSystem); end;
+    mrThinking:begin Indicator := ' ' + SYM_THINK + ' '; IndSty := Theme.InfoLabel; ContentSty := Theme.MutedText; BgSty := TStyle.Default.WithBg(Theme.BgThinking); end;
   end;
-
-  // AI messages get a background color block + padding.
-  if M.Role = mrAI then
-  begin
-    // Top padding line.
-    Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-    Inc(Y);
-    Inc(Result);
-  end;
-
-  // Paint background for the indicator line.
-  Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-  // Indicator.
-  Buf.SetStringN(X, Y, Indicator, W, IndSty.Patch(BgSty));
-  // Content on same line after indicator.
-  ContentStart := GraphemeWidth(Indicator);
-
-  // Split content by LF for multi-line messages.
-  // Two-pass: count lines, then Copy slices (no char-by-char concat).
+  // AI top padding.
+  if M.Role = mrAI then begin Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty); Inc(Y); Inc(Result); end;
+  // Split content.
   LineCount_ := 1;
+  for I := 1 to Length(M.Content) do if M.Content[I] = #10 then Inc(LineCount_);
+  SetLength(Lines, LineCount_); LineCount_ := 0; SliceStart := 1;
   for I := 1 to Length(M.Content) do
-    if M.Content[I] = #10 then Inc(LineCount_);
-  SetLength(Lines, LineCount_);
-  LineCount_ := 0;
-  SliceStart := 1;
-  for I := 1 to Length(M.Content) do
-  begin
-    if M.Content[I] = #10 then
-    begin
-      Lines[LineCount_] := Copy(M.Content, SliceStart, I - SliceStart);
-      Inc(LineCount_);
-      SliceStart := I + 1;
-    end;
-  end;
-  Lines[LineCount_] := Copy(M.Content, SliceStart, Length(M.Content) - SliceStart + 1);
-  Inc(LineCount_);
-
-  // Recalculate ContentStart as the display-column offset for content.
-  ContentStart := GraphemeWidth(Indicator);
-
-  // First line on the indicator row.
-  if LineCount_ > 0 then
-    Buf.SetStringN(X + ContentStart, Y, Lines[0], W - ContentStart, ContentSty.Patch(BgSty));
-  Inc(Y);
-  Inc(Result);
-
-  // Subsequent lines indented to align under content (3 spaces for AI).
-  for I := 1 to LineCount_ - 1 do
-  begin
+    if M.Content[I] = #10 then begin Lines[LineCount_] := Copy(M.Content, SliceStart, I - SliceStart); Inc(LineCount_); SliceStart := I + 1; end;
+  Lines[LineCount_] := Copy(M.Content, SliceStart, Length(M.Content) - SliceStart + 1); Inc(LineCount_);
+  ContentCol := GraphemeWidth(Indicator);
+  // First line.
+  Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
+  Buf.SetStringN(X, Y, Indicator, W, IndSty.Patch(BgSty));
+  if LineCount_ > 0 then Buf.SetStringN(X + ContentCol, Y, Lines[0], W - ContentCol, ContentSty.Patch(BgSty));
+  Inc(Y); Inc(Result);
+  // Subsequent lines.
+  for I := 1 to LineCount_ - 1 do begin
     Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-    Buf.SetStringN(X + ContentStart, Y, Lines[I], W - ContentStart, ContentSty.Patch(BgSty));
-    Inc(Y);
-    Inc(Result);
+    Buf.SetStringN(X + ContentCol, Y, Lines[I], W - ContentCol, ContentSty.Patch(BgSty));
+    Inc(Y); Inc(Result);
   end;
-
   // AI bottom padding.
-  if M.Role = mrAI then
-  begin
-    Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty);
-    Inc(Result);
-  end;
+  if M.Role = mrAI then begin Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty); Inc(Result); end;
 end;
 
 procedure RenderFrame;
 var
   Frame: TFrame;
-  Rows: TRectArray;
-  MsgArea, InputArea, Status1Area, Status2Area: TRect;
-  InputBlock: TBlock;
-  InputInner: TRect;
-  I, Y, J, RowsUsed, TotalRows: Integer;
-  StatusLeft, StatusRight, HintLeft, StateRight: AnsiString;
-  Sp: AnsiString;
-  PopupArea: TRect;
-  C: TClear;
-  PopupBlock: TBlock;
-  PopupPara: TParagraph;
+  MsgArea, BottomBox: TRect;
+  HostHeight, InputHeight, StatusHeight, SepCount, BottomHeight: Integer;
+  InnerX, InnerW, CurY, I, J, Y, RowsUsed: Integer;
+  Sp, StatusLeft, StatusRight, HintLeft, StateRight: AnsiString;
 begin
   Frame := Term.BeginFrame;
-
-  // Fill entire frame with primary background.
   Frame.Buffer.SetStyle(Frame.Area, TStyle.Default.WithBg(Theme.BgPrimary));
 
-  Rows := VerticalSplit(Frame.Area, [
-    MinConstraint(0),
-    LengthConstraint(3),
-    LengthConstraint(1),
-    LengthConstraint(1)
-  ]);
-  MsgArea     := Rows[0];
-  InputArea   := Rows[1];
-  Status1Area := Rows[2];
-  Status2Area := Rows[3];
+  // Calculate bottom pane height.
+  HostHeight := 0;
+  if Length(ToolStatusLine) > 0 then HostHeight := 1;
+  if State = asSlashMenu then HostHeight := 5;
+  InputHeight := 1;
+  StatusHeight := 2;
+  SepCount := 1 + Ord(HostHeight > 0);  // always input-status sep; host-input sep if host
+  BottomHeight := 2 + HostHeight + SepCount + InputHeight + StatusHeight;  // 2 = top+bottom border
 
-  // === Messages area ===
-  // Calculate total visual rows needed (for scroll).
-  TotalRows := 0;
-  for I := 0 to MsgCount - 1 do
-  begin
-    Inc(TotalRows);  // at least 1 row per message
-    if Msgs[I].Role = mrAI then Inc(TotalRows, 2);  // padding
-    // Count LF in content for multi-line.
-    for Y := 1 to Length(Msgs[I].Content) do
-      if Msgs[I].Content[Y] = #10 then Inc(TotalRows);
-  end;
+  MsgArea := TRect.Make(Frame.Area.X, Frame.Area.Y, Frame.Area.Width, Frame.Area.Height - BottomHeight);
+  BottomBox := TRect.Make(Frame.Area.X, Frame.Area.Y + MsgArea.Height, Frame.Area.Width, BottomHeight);
 
-  // Render messages bottom-up (newest at bottom of area).
+  // === Messages ===
   Y := MsgArea.Y + MsgArea.Height;
-  // Walk backwards to find which messages fit.
   I := MsgCount - 1 + ScrollOffset;
   if I >= MsgCount then I := MsgCount - 1;
-  while (I >= 0) and (Y > MsgArea.Y) do
-  begin
+  while (I >= 0) and (Y > MsgArea.Y) do begin
     RowsUsed := 1;
     if Msgs[I].Role = mrAI then Inc(RowsUsed, 2);
-    for J := 1 to Length(Msgs[I].Content) do
-      if Msgs[I].Content[J] = #10 then Inc(RowsUsed);
-    Dec(Y, RowsUsed);
-    Dec(I);
+    for J := 1 to Length(Msgs[I].Content) do if Msgs[I].Content[J] = #10 then Inc(RowsUsed);
+    Dec(Y, RowsUsed); Dec(I);
   end;
-  Inc(I);
-  if Y < MsgArea.Y then Y := MsgArea.Y;
-
-  // Now render forward from I.
-  while (I < MsgCount) and (Y < MsgArea.Y + MsgArea.Height) do
-  begin
+  Inc(I); if Y < MsgArea.Y then Y := MsgArea.Y;
+  while (I < MsgCount) and (Y < MsgArea.Y + MsgArea.Height) do begin
     RowsUsed := RenderMessage(Frame.Buffer, Msgs[I], MsgArea.X, Y, MsgArea.Width);
-    Inc(Y, RowsUsed);
-    Inc(I);
+    Inc(Y, RowsUsed); Inc(I);
+  end;
+  // Welcome if empty.
+  if MsgCount = 0 then begin
+    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 1, 'Welcome to cli888', Theme.UserLabel);
+    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 3, 'Type a message and press Enter.', Theme.SecondaryText);
+    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 4, 'Try / for commands, Ctrl+P for palette.', Theme.SecondaryText);
   end;
 
-  // === Input box (rounded border) ===
-  InputBlock := TBlock.Default
-    .WithBorders(BordersAll)
-    .WithBorderSet(BorderSetRounded)
-    .WithTitle(' ' + SYM_USER + ' ')
-    .WithTitleStyle(Theme.UserLabel)
-    .WithStyle(TStyle.Default.WithBg(Theme.BgInput));
-  if State = asIdle then
-    InputBlock := InputBlock.WithBorderStyle(Theme.InputBorderFocused)
-  else
-    InputBlock := InputBlock.WithBorderStyle(Theme.InputBorderBlurred);
-  InputBlock.Render(InputArea, Frame.Buffer);
-  InputInner := InputBlock.Inner(InputArea);
+  // === Bottom pane box ===
+  InnerX := BottomBox.X + 1;
+  InnerW := BottomBox.Width - 2;
+  CurY := BottomBox.Y;
 
+  // Top border: ╭─────╮
+  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedTL, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  for I := 1 to Integer(BottomBox.Width) - 2 do
+    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedTR, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Inc(CurY);
+
+  // Host surface (tool status / slash menu).
+  if HostHeight > 0 then begin
+    // Left/right vertical borders for host rows.
+    for I := 0 to HostHeight - 1 do begin
+      Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+      Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    end;
+    if State = asSlashMenu then begin
+      // Render slash menu items.
+      for I := 0 to 4 do begin
+        if I = SlashMenuSel then
+          Sp := ' ' + SYM_TOOL + ' '
+        else
+          Sp := '   ';
+        Frame.Buffer.SetStringN(InnerX, CurY + I, Sp + SLASH_CMDS[I, 0], 14,
+          TStyle.Default.WithFg(Theme.AccentTool).WithBg(Theme.BgInput));
+        Frame.Buffer.SetStringN(InnerX + 14, CurY + I, SLASH_CMDS[I, 1], InnerW - 14,
+          TStyle.Default.WithFg(Theme.FgSecondary).WithBg(Theme.BgInput));
+      end;
+    end else begin
+      // Tool status line.
+      Frame.Buffer.SetStringN(InnerX, CurY, ' ' + ToolStatusLine, InnerW,
+        TStyle.Default.WithFg(Theme.StatusInfo).WithBg(Theme.BgInput));
+    end;
+    Inc(CurY, HostHeight);
+    RenderSeparator(Frame.Buffer, BottomBox.X, CurY, BottomBox.Width);
+    Inc(CurY);
+  end;
+
+  // Input surface.
+  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default.WithBg(Theme.BgInput));
   if Length(InputBuf) = 0 then
-    // Placeholder.
-    Frame.Buffer.SetStringN(InputInner.X, InputInner.Y, 'Type a message...', InputInner.Width, Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)))
+    Frame.Buffer.SetStringN(InnerX + 1, CurY, PLACEHOLDER, InnerW - 1, Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)))
   else
-    Frame.Buffer.SetStringN(InputInner.X, InputInner.Y, InputBuf, InputInner.Width, Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+    Frame.Buffer.SetStringN(InnerX + 1, CurY, InputBuf, InnerW - 1, Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+  Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
+  Frame.CursorPos.X := InnerX + 1 + InputCurCol;
+  Frame.CursorPos.Y := CurY;
+  Inc(CurY, InputHeight);
 
-  Frame.HasCursor := (State = asIdle);
-  Frame.CursorPos.X := InputInner.X + InputCurCol;
-  Frame.CursorPos.Y := InputInner.Y;
+  // Separator before status.
+  RenderSeparator(Frame.Buffer, BottomBox.X, CurY, BottomBox.Width);
+  Inc(CurY);
 
-  // === Status row 1: CWD + model ===
-  Frame.Buffer.SetStyle(Status1Area, Theme.StatusBarStyle);
+  // Status surface (2 rows).
+  for I := 0 to StatusHeight - 1 do begin
+    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY + I, InnerW, 1), Theme.StatusBarStyle);
+  end;
+  // Row 1: CWD + model.
   StatusLeft := ' ' + CwdPath;
   StatusRight := ModelName + ' ';
-  Frame.Buffer.SetStringN(Status1Area.X, Status1Area.Y, StatusLeft, Status1Area.Width, Theme.StatusBarStyle);
-  Frame.Buffer.SetStringN(
-    Status1Area.X + Integer(Status1Area.Width) - Length(StatusRight),
-    Status1Area.Y, StatusRight, Length(StatusRight),
+  Frame.Buffer.SetStringN(InnerX, CurY, StatusLeft, InnerW, Theme.StatusBarStyle);
+  Frame.Buffer.SetStringN(InnerX + InnerW - Length(StatusRight), CurY, StatusRight, Length(StatusRight),
     TStyle.Default.WithBg(Theme.BgSecondary).WithFg(Theme.FgPrimary).WithModifier([mbBold]));
-
-  // === Status row 2: hints + state ===
-  Frame.Buffer.SetStyle(Status2Area, Theme.StatusBarStyle);
-  HintLeft := ' Enter send  /commands  Ctrl+C quit';
+  Inc(CurY);
+  // Row 2: hints + state.
+  HintLeft := ' Enter send  / cmds  Ctrl+C quit';
   case State of
-    asIdle:     StateRight := 'State: Idle ';
-    asThinking: begin Sp := SPINNER[SpinnerTick mod 10]; StateRight := Sp + ' Thinking... '; end;
-    asStreaming: begin Sp := SPINNER[SpinnerTick mod 10]; StateRight := Sp + ' Streaming '; end;
-    asPalette:  StateRight := 'State: Palette ';
+    asIdle:      StateRight := 'Idle ';
+    asThinking:  StateRight := SPINNER[SpinnerTick mod 10] + ' Thinking ';
+    asStreaming: StateRight := SPINNER[SpinnerTick mod 10] + ' Streaming ';
+    asSlashMenu: StateRight := '/ Menu ';
   end;
-  Frame.Buffer.SetStringN(Status2Area.X, Status2Area.Y, HintLeft, Status2Area.Width, Theme.StatusBarStyle);
-  Frame.Buffer.SetStringN(
-    Status2Area.X + Integer(Status2Area.Width) - Length(StateRight),
-    Status2Area.Y, StateRight, Length(StateRight),
+  Frame.Buffer.SetStringN(InnerX, CurY, HintLeft, InnerW, Theme.StatusBarStyle);
+  Frame.Buffer.SetStringN(InnerX + InnerW - Length(StateRight), CurY, StateRight, Length(StateRight),
     TStyle.Default.WithBg(Theme.BgSecondary).WithFg(Theme.StatusInfo));
+  Inc(CurY);
 
-  // === Command palette popup ===
-  if State = asPalette then
-  begin
-    PopupArea := TRect.Make(
-      Frame.Area.X + (Frame.Area.Width - 50) div 2,
-      Frame.Area.Y + (Frame.Area.Height - 9) div 2, 50, 9);
-    C := ClearWidget; C.Render(PopupArea, Frame.Buffer);
-    PopupBlock := TBlock.Default.WithBorders(BordersAll)
-      .WithBorderSet(BorderSetRounded)
-      .WithTitle(' commands ')
-      .WithBorderStyle(TStyle.Default.WithFg(Theme.AccentTool).WithModifier([mbBold]))
-      .WithStyle(TStyle.Default.WithBg(RgbColor(25, 25, 35)));
-    PopupPara := TParagraph.FromString(
-      '  /help    ' + #$E2#$80#$94 + ' show help' + #10 +
-      '  /clear   ' + #$E2#$80#$94 + ' clear history' + #10 +
-      '  /quit    ' + #$E2#$80#$94 + ' exit' + #10 + #10 +
-      '  Ctrl+P   ' + #$E2#$80#$94 + ' toggle palette' + #10 +
-      '  Esc      ' + #$E2#$80#$94 + ' close')
-      .WithBlock(PopupBlock)
-      .WithStyle(TStyle.Default.WithFg(Theme.FgPrimary).WithBg(RgbColor(25, 25, 35)));
-    PopupPara.Render(PopupArea, Frame.Buffer);
-  end;
+  // Bottom border: ╰─────╯
+  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedBL, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  for I := 1 to Integer(BottomBox.Width) - 2 do
+    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedBR, 1, TStyle.Default.WithFg(Theme.BorderNormal));
 
   Term.EndFrame(Frame);
 end;
 
+// === Input handling ===
+
 procedure HandleKey(const K: TKeyEvent);
 begin
-  if State = asPalette then begin
-    if (K.Code = kcEsc) or ((K.Code = kcChar) and (K.Ch = Ord('p')) and (kmCtrl in K.Modifiers)) then State := asIdle;
+  if State = asSlashMenu then begin
+    case K.Code of
+      kcEsc: begin State := asIdle; InputBuf := ''; InputCurCol := 0; end;
+      kcUp: if SlashMenuSel > 0 then Dec(SlashMenuSel);
+      kcDown: if SlashMenuSel < 4 then Inc(SlashMenuSel);
+      kcEnter: begin
+        InputBuf := '/' + SLASH_CMDS[SlashMenuSel, 0];
+        InputCurCol := GraphemeWidth(InputBuf);
+        State := asIdle;
+        SendMessage;
+      end;
+    else end;
     Exit;
   end;
   if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin Term.RequestQuit; Exit; end;
-  if (K.Code = kcChar) and (K.Ch = Ord('p')) and (kmCtrl in K.Modifiers) then begin State := asPalette; Exit; end;
   case K.Code of
     kcEsc: Term.RequestQuit;
     kcEnter: if State = asIdle then SendMessage;
-    kcBackspace: if State = asIdle then BackspaceInput;
-    kcChar: if (State = asIdle) and (K.Ch >= 32) then InsertInput(K.Ch);
+    kcBackspace: if State = asIdle then begin
+      BackspaceInput;
+      if (Length(InputBuf) = 0) and (State = asSlashMenu) then State := asIdle;
+    end;
+    kcChar: if (State = asIdle) and (K.Ch >= 32) then begin
+      InsertInput(K.Ch);
+      // Trigger slash menu on '/'.
+      if (InputBuf = '/') then begin State := asSlashMenu; SlashMenuSel := 0; end;
+    end;
     kcLeft: if InputCurCol > 0 then Dec(InputCurCol);
     kcRight: if InputCurCol < GraphemeWidth(InputBuf) then Inc(InputCurCol);
-    kcPageUp: begin Inc(ScrollOffset, 5); end;
+    kcPageUp: Inc(ScrollOffset, 5);
     kcPageDown: begin Dec(ScrollOffset, 5); if ScrollOffset < 0 then ScrollOffset := 0; end;
-    kcUp: begin Inc(ScrollOffset); end;
+    kcUp: Inc(ScrollOffset);
     kcDown: begin Dec(ScrollOffset); if ScrollOffset < 0 then ScrollOffset := 0; end;
   else end;
 end;
+
+// === Main ===
 
 var
   Ev: TEvent;
@@ -469,17 +423,17 @@ begin
   MsgCount := 0; InputBuf := ''; InputCurCol := 0;
   State := asIdle; ResponseIdx := 0; TokenCount := 0;
   ScrollOffset := 0; ThinkTick := 0; SpinnerTick := 0;
+  SlashMenuSel := 0; SlashMenuFilter := '';
+  ToolStatusLine := '';
   ModelName := 'claude-opus-4-7';
   CwdPath := '~/projects/fafafa.tui';
 
   AddMsg(mrSystem, 'Welcome to cli888. Type a message and press Enter.');
-  AddMsg(mrSystem, 'Try: /help, /clear, Ctrl+P for command palette.');
 
   Term := TTerminal.Create;
   try
     if not Term.EnterTui then begin WriteLn('not a tty'); Halt(1); end;
-    while not Term.ShouldQuit do
-    begin
+    while not Term.ShouldQuit do begin
       RenderFrame;
       case State of
         asThinking:  begin Ev := Term.PollEvent(80); AdvanceThinking; end;
