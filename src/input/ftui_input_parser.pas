@@ -221,6 +221,21 @@ begin
       else
         Exit(prInvalid);
       end;
+    Ord('u'):
+      // CSI u (kitty keyboard protocol): ESC [ <keycode> ; <mods> u
+      // Param1 = Unicode codepoint or special key code.
+      case Param1 of
+        13: Out_ := KeyCodeEvent(kcEnter, Mods);     // Enter
+        9:  Out_ := KeyCodeEvent(kcTab, Mods);       // Tab
+        27: Out_ := KeyCodeEvent(kcEsc, Mods);       // Esc
+        127: Out_ := KeyCodeEvent(kcBackspace, Mods);// Backspace
+      else
+        // Generic codepoint with modifiers.
+        if Param1 >= 32 then
+          Out_ := KeyCharEvent(LongWord(Param1), Mods)
+        else
+          Exit(prInvalid);
+      end;
   else
     Exit(prInvalid);
   end;
