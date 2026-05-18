@@ -33,7 +33,8 @@ interface
 uses
   ftui_color,
   ftui_modifier,
-  ftui_style;
+  ftui_style,
+  ftui_grapheme;
 
 type
   TAlignment = (caLeft, caCenter, caRight);
@@ -104,7 +105,7 @@ end;
 
 function TSpan.Width: Integer;
 begin
-  Result := System.Length(Content);
+  Result := GraphemeWidth(Content);
 end;
 
 function TSpan.WithStyle(const St: TStyle): TSpan;

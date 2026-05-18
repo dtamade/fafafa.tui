@@ -25,7 +25,8 @@ uses
   ftui_color,
   ftui_modifier,
   ftui_style,
-  ftui_cell;
+  ftui_cell,
+  ftui_grapheme;
 
 type
   TDiffEntry = packed record
@@ -149,8 +150,11 @@ end;
 function TBuffer.SetStringN(X, Y: Integer; const S: AnsiString;
   MaxWidth: Integer; const Sty: TStyle): Integer;
 var
-  Right, Remaining, I, Cursor: Integer;
+  Right, Remaining, I, Cursor, GLen: Integer;
   CP: PCell;
+  Adv: TGraphemeAdvance;
+  Ascii: Boolean;
+  B: Byte;
 begin
   Result := 0;
   if (Y < FArea.Y) or (Y >= FArea.Y + FArea.Height) then Exit;
@@ -161,21 +165,75 @@ begin
   Remaining := Right - X;
   if Remaining > MaxWidth then Remaining := MaxWidth;
   if Remaining <= 0 then Exit;
+  GLen := System.Length(S);
+  if GLen = 0 then Exit;
+
+  // Hot ASCII path — most cli888 strings (status bars, English UI)
+  // are pure ASCII, so we keep the byte-loop intact for them.
+  Ascii := True;
+  for I := 1 to GLen do
+    if Byte(S[I]) >= $80 then
+    begin
+      Ascii := False;
+      Break;
+    end;
 
   Cursor := X;
-  // M0: ASCII-only byte-as-column.  CR/LF/control bytes are skipped to
-  // match ratatui's `is_control` filter; any byte >= 32 advances by 1.
-  for I := 1 to System.Length(S) do
+  if Ascii then
+  begin
+    for I := 1 to GLen do
+    begin
+      if Remaining = 0 then Break;
+      B := Byte(S[I]);
+      if B < 32 then Continue;        // drop controls (ratatui parity)
+      CP := @FContent[IndexOfPos(Cursor, Y)];
+      CellSetSymbolAscii(CP^, S[I]);
+      CellApplyStyle(CP^, Sty);
+      Inc(Cursor);
+      Inc(Result);
+      Dec(Remaining);
+    end;
+    Exit;
+  end;
+
+  // UTF-8 grapheme path.  Decode codepoint by codepoint.  A width-2
+  // cluster occupies two cells: the leading cell carries the glyph
+  // bytes and Width=2; the trailing cell is reset to CellEmpty with
+  // Width=0 and Skip=True so the diff/render layer knows to leave it
+  // alone.
+  I := 0;
+  while I < GLen do
   begin
     if Remaining = 0 then Break;
-    if Byte(S[I]) < 32 then
-      Continue;             // drop controls (matches ratatui behavior)
+    Adv := GraphemeAdvance(S[1], GLen, I);
+
+    // Drop ASCII controls; treat zero-width codepoints as advance-only.
+    if Adv.Width = 0 then
+    begin
+      Inc(I, Adv.ByteLen);
+      Continue;
+    end;
+
+    if Adv.Width > Remaining then Break;   // not enough room for wide glyph
+
     CP := @FContent[IndexOfPos(Cursor, Y)];
-    CellSetSymbolAscii(CP^, S[I]);
+    CellSetSymbolBytes(CP^, PByte(@S[1])[I], Adv.ByteLen, Adv.Width);
     CellApplyStyle(CP^, Sty);
-    Inc(Cursor);
-    Inc(Result);
-    Dec(Remaining);
+
+    if Adv.Width = 2 then
+    begin
+      // Reset the trailing cell so the previous content doesn't bleed
+      // through; mark it skip so backends drop it from the patch list.
+      CP := @FContent[IndexOfPos(Cursor + 1, Y)];
+      CellReset(CP^);
+      CP^.Width := 0;
+      CP^.Skip := True;
+    end;
+
+    Inc(Cursor, Adv.Width);
+    Inc(Result, Adv.Width);
+    Dec(Remaining, Adv.Width);
+    Inc(I, Adv.ByteLen);
   end;
 end;
 
@@ -305,24 +363,30 @@ begin
 
   // Two-pass: first measure, then materialize once.  No s := s + ...
   // string concatenation, even on this cold/diagnostic path, so the
-  // pattern stays exemplary for code-review.
+  // pattern stays exemplary for code-review.  Width=0 sentinel cells
+  // (the trailing column of a CJK / wide grapheme) are skipped — the
+  // leading cell already supplies the multi-byte glyph.
   TotalBytes := 0;
   for X := FArea.X to FArea.X + FArea.Width - 1 do
   begin
     Idx := IndexOfPos(X, Y);
     CP := @FContent[Idx];
-    if CP^.Glyph.Len = 0 then
-      Inc(TotalBytes)               // empty cell renders as one space
+    if CP^.Width = 0 then
+      Continue                          // CJK trailing sentinel
+    else if CP^.Glyph.Len = 0 then
+      Inc(TotalBytes)                   // empty cell renders as one space
     else
       Inc(TotalBytes, CP^.Glyph.Len);
   end;
 
   SetLength(Result, TotalBytes);
-  OutByte := 1;                      // AnsiString is 1-indexed
+  OutByte := 1;                          // AnsiString is 1-indexed
   for X := FArea.X to FArea.X + FArea.Width - 1 do
   begin
     Idx := IndexOfPos(X, Y);
     CP := @FContent[Idx];
+    if CP^.Width = 0 then
+      Continue;
     GlyphLen := CP^.Glyph.Len;
     if GlyphLen = 0 then
     begin
