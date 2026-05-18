@@ -15,7 +15,10 @@ uses
   test_modifier,
   test_style,
   test_cell,
-  test_buffer;
+  test_buffer,
+  test_bytes,
+  test_ansi,
+  test_ansi_backend;
 
 var
   Failed: Integer;
@@ -26,6 +29,9 @@ begin
   RegisterStyleTests;
   RegisterCellTests;
   RegisterBufferTests;
+  RegisterBytesTests;
+  RegisterAnsiTests;
+  RegisterAnsiBackendTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

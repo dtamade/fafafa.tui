@@ -23,11 +23,11 @@
 
 ### 判定标准
 
-- [ ] `make test` 跑通至少 30 个断言（涉及 rect/color/modifier/style/cell/buffer）
-- [ ] `AssertBufferEquals` 在断言失败时输出 ratatui 风格的 expected/actual diff
-- [ ] `make examples` 编译 hello_box.lpr 成功
-- [ ] 跑 `./build/bin/hello_box`，终端能看到红色边框 + 文字 + 800ms 后自动退出
-- [ ] `make clean && make` 全套从零构建 < 5 秒
+- [x] `make test` 跑通至少 30 个断言 — **77 断言全过**（rect 9 + color 8 + modifier 7 + style 10 + cell 7 + buffer 15 + bytes 8 + ansi 9 + backend 4）
+- [x] `AssertBufferEquals` 在断言失败时输出 ratatui 风格的 expected/actual diff — testkit 实现 `FormatDiff` 含 `*` 标记
+- [x] `make examples` 编译 hello_box.lpr 成功 — 99 行 compile 0.2 秒
+- [x] 跑 `./build/bin/hello_box`，终端能看到红色边框 + 文字 + 800ms 后自动退出 — script 录 PTY 字节流验证 `[?1049h ... +----------+ ... fafafa.tui ... [?1049l` 全程正确
+- [x] `make clean && make` 全套从零构建 < 5 秒 — **0.4 秒**（提前 10 倍）
 
 ## M1 — Text 与 Layout（目标：2 周）
 
@@ -134,4 +134,10 @@ cli888 主聊天界面骨架可拼。
 
 - [x] 项目骨架建立
 - [x] README / CLAUDE.md / 移植规范文档
-- [ ] M0 进行中
+- [x] **M0 完成（2026-05-18）** ✅
+  - 6 个核心单元 + 3 个 backend 单元 + testkit + hello_box demo
+  - 77 个测试断言全部通过，0 warning / 0 note
+  - clean build 0.4 秒（要求 < 5 秒，提前 10 倍）
+  - 二进制：test_runner 1.7M，hello_box ~500K
+  - 字节流验证：alt screen + cursor hide + clear + 边框 + 文字 + leave alt
+- [ ] M1 进行中
