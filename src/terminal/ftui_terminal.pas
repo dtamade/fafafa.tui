@@ -208,6 +208,7 @@ begin
     Sz.Rows := 24;
   end;
 
+  if not IsATerminal(STDOUT_FD) then Exit;
   if not EnterRawMode(STDIN_FD, FSavedTermios) then Exit;
   FInRawMode := True;
 
@@ -375,6 +376,15 @@ begin
   case Ev.Kind of
     evMouse:
       begin
+        // NOTE: FPrevMousePos is updated AFTER consumer processes the event.
+        // We do it here because this runs before Exit, but the consumer
+        // reads PrevMousePos BEFORE calling PollEvent again.  The sequence:
+        //   1. Consumer calls PollEvent → gets event with current coords
+        //   2. PostProcessEvent updates FPrevMousePos to current coords
+        //   3. Consumer reads Term.PrevMousePos → gets CURRENT coords
+        //   4. Next PollEvent → consumer compares new event vs PrevMousePos
+        // This means PrevMousePos = "coords of the LAST event", which is
+        // exactly what DetectHoverChange needs (compare prev vs curr).
         FPrevMousePos.X := Ev.Mouse.X;
         FPrevMousePos.Y := Ev.Mouse.Y;
         // Auto-release capture on MouseUp.
@@ -432,13 +442,26 @@ begin
   CheckSignals(Resz, HasResize);
   if HasResize then Exit(Resz);
 
-  // 2. Wait for new bytes.  EINTR will trip the SIGWINCH handler;
-  // WaitForBytes returns false on signal-triggered EINTR (because
-  // poll(2) sees the signal as an interruption, not data ready).
+  // 2. Wait for new bytes.  EINTR will trip the SIGWINCH handler.
   if not WaitForBytes(STDIN_FD, TimeoutMs) then
   begin
     CheckSignals(Resz, HasResize);
     if HasResize then Exit(Resz);
+    // Timeout with pending bytes (e.g. bare ESC): retry with AtEOF=True
+    // so a lone ESC resolves to kcEsc instead of staying as NeedMore.
+    if FInputLen > 0 then
+    begin
+      R := ParseOne(FInputQueue[0], FInputLen, True, Result, Consumed);
+      if R = prSuccess then
+      begin
+        ParsedBytes := Consumed;
+        if ParsedBytes < FInputLen then
+          Move(FInputQueue[ParsedBytes], FInputQueue[0], FInputLen - ParsedBytes);
+        Dec(FInputLen, ParsedBytes);
+        PostProcessEvent(Result);
+        Exit;
+      end;
+    end;
     Exit;
   end;
 

@@ -63,7 +63,7 @@ fafafa.tui 依赖的终端能力及各终端支持情况。
 // TTerminal 提供能力查询：
 TTerminal.HasMouseTracking: Boolean;    // 1003h 是否生效
 TTerminal.HasTruecolor: Boolean;        // 检测 $COLORTERM
-TTerminal.HasKittyKeyboard: Boolean;    // CSI > 1u 是否生效
+TTerminal.HasKittyKeyboard: Boolean;    // $TERM_PROGRAM 乐观推断（kitty/wezterm/ghostty）
 ```
 
 消费方根据这些 flag 决定：

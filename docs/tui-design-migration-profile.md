@@ -91,8 +91,8 @@ TTerminal.Capture.Active: Boolean;            // 查询状态
 ```
 
 **行为**：
-- `SetCapture` 后，所有 mkMoved/mkDrag/mkUp 事件路由到 captured target
-- `ReleaseCapture` 或 mkUp 自动释放
+- `Capture.Acquire` 后，消费方自己基于 Capture.Active 判断事件是否属于当前 drag session
+- mkUp 时 TTerminal 自动 Session.Commit + Capture.Release
 - Esc 触发 `session.Cancel` → 自动 `ReleaseCapture`
 - 捕获期间鼠标离开终端窗口：不产生 Leave 事件（终端限制），但 Up 事件仍然到达
 

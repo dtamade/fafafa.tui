@@ -32,7 +32,8 @@ uses
   test_input_editor,
   test_interaction,
   test_overlay,
-  test_scrollbar;
+  test_scrollbar,
+  test_terminal_contract;
 
 var
   Failed: Integer;
@@ -60,6 +61,7 @@ begin
   RegisterInteractionTests;
   RegisterOverlayTests;
   RegisterScrollbarTests;
+  RegisterTerminalContractTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)
