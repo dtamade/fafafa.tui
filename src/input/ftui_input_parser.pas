@@ -40,7 +40,8 @@ unit ftui_input_parser;
 interface
 
 uses
-  ftui_event;
+  ftui_event,
+  ftui_grapheme;
 
 type
   TParseResult = (prSuccess, prNeedMore, prInvalid);
@@ -279,6 +280,8 @@ function ParseOne(const Buf; Len: Integer; AtEOF: Boolean;
 var
   B0, B1: Byte;
   R: TParseResult;
+  Adv: TGraphemeAdvance;
+  Need: Integer;
 begin
   Out_ := NoneEvent;
   Consumed := 0;
@@ -287,8 +290,30 @@ begin
   B0 := ByteAt(Buf, 0);
   if B0 <> 27 then
   begin
-    Consumed := 1;
-    Exit(ParseSingleByte(B0, Out_));
+    // ASCII range: single-byte dispatch.
+    if B0 < $80 then
+    begin
+      Consumed := 1;
+      Exit(ParseSingleByte(B0, Out_));
+    end;
+    // UTF-8 multi-byte: decode the codepoint and emit as kcChar.
+    // If the sequence is truncated (not enough bytes), report NeedMore
+    // so the caller reads more before retrying.
+    Adv := GraphemeAdvance(Buf, Len, 0);
+    if Adv.Codepoint = $FFFD then
+    begin
+      // Could be truncated UTF-8 or genuinely invalid.
+      if      (B0 and $E0) = $C0 then Need := 2
+      else if (B0 and $F0) = $E0 then Need := 3
+      else if (B0 and $F8) = $F0 then Need := 4
+      else Need := 1;
+      if Need > Len then Exit(prNeedMore);
+      Consumed := 1;
+      Exit(prInvalid);
+    end;
+    Out_ := KeyCharEvent(Adv.Codepoint, []);
+    Consumed := Adv.ByteLen;
+    Exit(prSuccess);
   end;
 
   // ESC sequences.
