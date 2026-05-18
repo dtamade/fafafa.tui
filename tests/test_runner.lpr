@@ -28,7 +28,8 @@ uses
   test_list,
   test_input_parser,
   test_terminal_smoke,
-  test_grapheme;
+  test_grapheme,
+  test_input_editor;
 
 var
   Failed: Integer;
@@ -52,6 +53,7 @@ begin
   RegisterInputParserTests;
   RegisterTerminalSmokeTests;
   RegisterGraphemeTests;
+  RegisterInputEditorTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)
