@@ -43,6 +43,7 @@ uses
   ftui_clear,
   ftui_grapheme,
   ftui_theme,
+  ftui_input_editor,
   ftui_event,
   ftui_terminal;
 
@@ -90,8 +91,7 @@ var
   Theme: TTheme;
   Msgs: array[0..MAX_MSGS - 1] of TMsg;
   MsgCount: Integer;
-  InputBuf: AnsiString;
-  InputCurCol: Integer;
+  Editor: TInputEditor;
   State: TAppState;
   StreamIdx, StreamRevealed: Integer;
   StreamTarget: AnsiString;
@@ -115,31 +115,6 @@ begin
   ScrollOffset := 0;
 end;
 
-function Ucs4ToUtf8(Cp: LongWord): AnsiString;
-begin
-  if Cp < $80 then begin SetLength(Result, 1); Result[1] := AnsiChar(Cp); end
-  else if Cp < $800 then begin SetLength(Result, 2); Result[1] := AnsiChar($C0 or (Cp shr 6)); Result[2] := AnsiChar($80 or (Cp and $3F)); end
-  else if Cp < $10000 then begin SetLength(Result, 3); Result[1] := AnsiChar($E0 or (Cp shr 12)); Result[2] := AnsiChar($80 or ((Cp shr 6) and $3F)); Result[3] := AnsiChar($80 or (Cp and $3F)); end
-  else begin SetLength(Result, 4); Result[1] := AnsiChar($F0 or (Cp shr 18)); Result[2] := AnsiChar($80 or ((Cp shr 12) and $3F)); Result[3] := AnsiChar($80 or ((Cp shr 6) and $3F)); Result[4] := AnsiChar($80 or (Cp and $3F)); end;
-end;
-
-function ColToByteOfs(const S: AnsiString; Col: Integer): Integer;
-var P, C: Integer; Adv: TGraphemeAdvance;
-begin P := 0; C := 0; while (P < Length(S)) and (C < Col) do begin Adv := GraphemeAdvance(S[1], Length(S), P); Inc(P, Adv.ByteLen); Inc(C, Adv.Width); end; Result := P; end;
-
-procedure InsertInput(Cp: LongWord);
-var S: AnsiString; B: Integer;
-begin S := Ucs4ToUtf8(Cp); B := ColToByteOfs(InputBuf, InputCurCol); Insert(S, InputBuf, B + 1); Inc(InputCurCol, GraphemeWidth(S)); end;
-
-procedure BackspaceInput;
-var C, PP, PW, BP: Integer; Adv: TGraphemeAdvance;
-begin
-  if InputCurCol <= 0 then Exit;
-  C := 0; PP := 0; PW := 1; BP := 0;
-  while C < InputCurCol do begin PP := BP; Adv := GraphemeAdvance(InputBuf[1], Length(InputBuf), BP); PW := Adv.Width; Inc(BP, Adv.ByteLen); Inc(C, Adv.Width); end;
-  Delete(InputBuf, PP + 1, BP - PP); Dec(InputCurCol, PW);
-  if InputCurCol < 0 then InputCurCol := 0;
-end;
 
 procedure StartResponse;
 begin State := asThinking; ThinkTick := 0; ToolStatusLine := ''; AddMsg(mrThinking, 'Analyzing...'); end;
@@ -174,14 +149,14 @@ end;
 
 procedure SendMessage;
 begin
-  if Length(InputBuf) = 0 then Exit;
-  AddMsg(mrUser, InputBuf);
-  Inc(TokenCount, Length(InputBuf) div 4);
-  if InputBuf = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /compact /quit')
-  else if InputBuf = '/clear' then MsgCount := 0
-  else if InputBuf = '/quit' then Term.RequestQuit
+  if Length(Editor.Content) = 0 then Exit;
+  AddMsg(mrUser, Editor.Content);
+  Inc(TokenCount, Length(Editor.Content) div 4);
+  if Editor.Content = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /compact /quit')
+  else if Editor.Content = '/clear' then MsgCount := 0
+  else if Editor.Content = '/quit' then Term.RequestQuit
   else StartResponse;
-  InputBuf := ''; InputCurCol := 0;
+  Editor.Clear;
 end;
 
 // === Rendering ===
@@ -244,7 +219,7 @@ var
   Frame: TFrame;
   MsgArea, BottomBox: TRect;
   HostHeight, InputHeight, StatusHeight, SepCount, BottomHeight: Integer;
-  InnerX, InnerW, CurY, I, J, Y, RowsUsed, SliceStart: Integer;
+  InnerX, InnerW, CurY, I, J, Y, RowsUsed: Integer;
   Sp, StatusLeft, StatusRight, HintLeft, StateRight: AnsiString;
 begin
   Frame := Term.BeginFrame;
@@ -256,11 +231,10 @@ begin
   HostHeight := 0;
   if Length(ToolStatusLine) > 0 then HostHeight := 1;
   if State = asSlashMenu then HostHeight := 5;
-  // Input height: count LF in InputBuf, clamp to 1..4.
-  InputHeight := 1;
-  for I := 1 to Length(InputBuf) do
-    if InputBuf[I] = #10 then Inc(InputHeight);
+  // Input height from editor line count, clamped to 1..4.
+  InputHeight := Editor.LineCount;
   if InputHeight > 4 then InputHeight := 4;
+  if InputHeight < 1 then InputHeight := 1;
   StatusHeight := 2;
   SepCount := 1 + Ord(HostHeight > 0);  // always input-status sep; host-input sep if host
   BottomHeight := 2 + HostHeight + SepCount + InputHeight + StatusHeight;  // 2 = top+bottom border
@@ -331,36 +305,18 @@ begin
     Inc(CurY);
   end;
 
-  // Input surface (multi-line support).
+  // Input surface — delegate to TInputEditor.
   for I := 0 to InputHeight - 1 do begin
     Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
     Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
   end;
   Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default.WithBg(Theme.BgInput));
-  if Length(InputBuf) = 0 then
-    Frame.Buffer.SetStringN(InnerX + 1, CurY, PLACEHOLDER, InnerW - 1, Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)))
-  else begin
-    // Render each line of InputBuf.
-    J := 0; SliceStart := 1;
-    for I := 1 to Length(InputBuf) do begin
-      if InputBuf[I] = #10 then begin
-        Frame.Buffer.SetStringN(InnerX + 1, CurY + J, Copy(InputBuf, SliceStart, I - SliceStart), InnerW - 1,
-          Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
-        Inc(J); SliceStart := I + 1;
-        if J >= InputHeight then Break;
-      end;
-    end;
-    if J < InputHeight then
-      Frame.Buffer.SetStringN(InnerX + 1, CurY + J, Copy(InputBuf, SliceStart, Length(InputBuf) - SliceStart + 1), InnerW - 1,
-        Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
-  end;
+  Editor.Render(TRect.Make(InnerX + 1, CurY, InnerW - 1, InputHeight), Frame.Buffer,
+    Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
+    Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
+    PLACEHOLDER);
   Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
-  // Cursor position: find which line and column the cursor is on.
-  // For simplicity, cursor is always on the last line at InputCurCol
-  // relative to that line's start.  (Full cursor tracking across lines
-  // would need per-line column state — deferred.)
-  Frame.CursorPos.X := InnerX + 1 + InputCurCol;
-  Frame.CursorPos.Y := CurY + InputHeight - 1;
+  Frame.CursorPos := Editor.CursorScreenPos(TRect.Make(InnerX + 1, CurY, InnerW - 1, InputHeight));
   Inc(CurY, InputHeight);
 
   // Separator before status.
@@ -405,27 +361,28 @@ end;
 // === Input handling ===
 
 procedure HandleKey(const K: TKeyEvent);
+var I: Integer;
 begin
   if State = asSlashMenu then begin
     case K.Code of
-      kcEsc: begin State := asIdle; InputBuf := ''; InputCurCol := 0; end;
+      kcEsc: begin State := asIdle; Editor.Clear; end;
       kcBackspace: begin
-        BackspaceInput;
-        // If input is now empty (deleted the '/'), exit menu.
-        if Length(InputBuf) = 0 then State := asIdle;
+        Editor.DeleteBackward;
+        if Editor.IsEmpty then State := asIdle;
       end;
       kcUp: if SlashMenuSel > 0 then Dec(SlashMenuSel);
       kcDown: if SlashMenuSel < 4 then Inc(SlashMenuSel);
       kcEnter: begin
-        InputBuf := '/' + SLASH_CMDS[SlashMenuSel, 0];
-        InputCurCol := GraphemeWidth(InputBuf);
+        Editor.Clear;
+        // Insert the selected command text then send.
+        Editor.InsertChar(Ord('/'));
+        for I := 1 to Length(SLASH_CMDS[SlashMenuSel, 0]) do
+          Editor.InsertChar(Ord(SLASH_CMDS[SlashMenuSel, 0][I]));
         State := asIdle;
         SendMessage;
       end;
-      kcChar: begin
-        // Allow typing to filter (append to input).
-        if K.Ch >= 32 then InsertInput(K.Ch);
-      end;
+      kcChar:
+        if K.Ch >= 32 then Editor.InsertChar(K.Ch);
     else end;
     Exit;
   end;
@@ -434,27 +391,25 @@ begin
     kcEsc: Term.RequestQuit;
     kcEnter:
       if State = asIdle then begin
-        // Alt+Enter = newline in input; plain Enter = send.
-        if kmAlt in K.Modifiers then
-          InsertInput(10)    // LF
+        if (kmShift in K.Modifiers) or (kmAlt in K.Modifiers) then
+          Editor.InsertNewline
         else
           SendMessage;
       end;
-    kcBackspace: if State = asIdle then begin
-      BackspaceInput;
-      if (Length(InputBuf) = 0) and (State = asSlashMenu) then State := asIdle;
-    end;
+    kcBackspace: if State = asIdle then Editor.DeleteBackward;
+    kcDelete: if State = asIdle then Editor.DeleteForward;
     kcChar: if (State = asIdle) and (K.Ch >= 32) then begin
-      InsertInput(K.Ch);
-      // Trigger slash menu on '/'.
-      if (InputBuf = '/') then begin State := asSlashMenu; SlashMenuSel := 0; end;
+      Editor.InsertChar(K.Ch);
+      if Editor.Content = '/' then begin State := asSlashMenu; SlashMenuSel := 0; end;
     end;
-    kcLeft: if InputCurCol > 0 then Dec(InputCurCol);
-    kcRight: if InputCurCol < GraphemeWidth(InputBuf) then Inc(InputCurCol);
+    kcLeft: Editor.MoveLeft;
+    kcRight: Editor.MoveRight;
+    kcUp: if Editor.LineCount > 1 then Editor.MoveUp else Inc(ScrollOffset);
+    kcDown: if Editor.LineCount > 1 then Editor.MoveDown else begin Dec(ScrollOffset); if ScrollOffset < 0 then ScrollOffset := 0; end;
+    kcHome: Editor.MoveHome;
+    kcEnd: Editor.MoveEnd;
     kcPageUp: Inc(ScrollOffset, 5);
     kcPageDown: begin Dec(ScrollOffset, 5); if ScrollOffset < 0 then ScrollOffset := 0; end;
-    kcUp: Inc(ScrollOffset);
-    kcDown: begin Dec(ScrollOffset); if ScrollOffset < 0 then ScrollOffset := 0; end;
   else end;
 end;
 
@@ -464,7 +419,8 @@ var
   Ev: TEvent;
 begin
   Theme := ThemeDefaultDark;
-  MsgCount := 0; InputBuf := ''; InputCurCol := 0;
+  MsgCount := 0;
+  Editor := TInputEditor.CreateWithMaxLines(4);
   State := asIdle; ResponseIdx := 0; TokenCount := 0;
   ScrollOffset := 0; ThinkTick := 0; SpinnerTick := 0;
   SlashMenuSel := 0; SlashMenuFilter := '';
@@ -493,6 +449,6 @@ begin
       else end;
     end;
   finally
-    Term.LeaveTui; Term.Free;
+    Term.LeaveTui; Term.Free; Editor.Free;
   end;
 end.
