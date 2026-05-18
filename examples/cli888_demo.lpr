@@ -144,7 +144,10 @@ begin
   if StreamRevealed < Length(StreamTarget) then begin
     Inc(StreamRevealed);
     Msgs[StreamIdx].Content := Copy(StreamTarget, 1, StreamRevealed);
-  end else begin State := asIdle; ToolStatusLine := ''; end;
+  end else begin
+    State := asIdle;
+    ToolStatusLine := '';
+  end;
 end;
 
 procedure SendMessage;
@@ -400,6 +403,7 @@ begin
     Exit;
   end;
   if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin Term.RequestQuit; Exit; end;
+  if (K.Code = kcChar) and (K.Ch = Ord('l')) and (kmCtrl in K.Modifiers) then begin MsgCount := 0; ScrollOffset := 0; Exit; end;
   case K.Code of
     kcEsc: Term.RequestQuit;
     kcEnter:
