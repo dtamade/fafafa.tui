@@ -84,6 +84,7 @@ type
     Role: TMsgRole;
     Content: AnsiString;
     ToolDone: Boolean;
+    Timestamp: Int64;      // GetTickCount64 at creation
   end;
 
 var
@@ -116,6 +117,7 @@ begin
   Msgs[MsgCount].Role := Role;
   Msgs[MsgCount].Content := Content;
   Msgs[MsgCount].ToolDone := (Role = mrTool);
+  Msgs[MsgCount].Timestamp := GetTickCount64;
   Inc(MsgCount);
   ScrollOffset := 0;
 end;
@@ -151,7 +153,7 @@ begin
     Msgs[StreamIdx].Content := Copy(StreamTarget, 1, StreamRevealed);
   end else begin
     State := asIdle;
-    ToolStatusLine := '';
+    ToolStatusLine := SYM_CHECK + ' ' + IntToStr(Length(StreamTarget) div 4) + ' tokens';
   end;
 end;
 
@@ -160,8 +162,14 @@ begin
   if Length(Editor.Content) = 0 then Exit;
   AddMsg(mrUser, Editor.Content);
   Inc(TokenCount, Length(Editor.Content) div 4);
-  if Editor.Content = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /compact /quit')
+  if Editor.Content = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /quit | Ctrl+L clear | Ctrl+D quit | ' + #$E2#$86#$91#$E2#$86#$93 + ' history')
   else if Editor.Content = '/clear' then MsgCount := 0
+  else if Editor.Content = '/model' then begin
+    if ModelName = 'claude-opus-4-7' then ModelName := 'claude-sonnet-4-6'
+    else if ModelName = 'claude-sonnet-4-6' then ModelName := 'claude-haiku-4-5'
+    else ModelName := 'claude-opus-4-7';
+    AddMsg(mrSystem, 'Model switched to ' + ModelName);
+  end
   else if Editor.Content = '/quit' then Term.RequestQuit
   else StartResponse;
   Editor.Clear;
@@ -180,10 +188,11 @@ end;
 
 function RenderMessage(Buf: TBuffer; const M: TMsg; X, Y, W: Integer): Integer;
 var
-  Indicator: AnsiString;
+  Indicator, TimeStr: AnsiString;
   IndSty, ContentSty: TStyle;
   I, ContentCol, SliceStart, LineCount_: Integer;
   Lines: array of AnsiString;
+  ElapsedSec: Int64;
 begin
   Result := 0;
   if W <= 4 then Exit;
@@ -209,6 +218,13 @@ begin
   // First line.
   Buf.SetStringN(X, Y, Indicator, W, IndSty);
   if LineCount_ > 0 then Buf.SetStringN(X + ContentCol, Y, Lines[0], W - ContentCol, ContentSty);
+  // Relative timestamp on the right edge.
+  ElapsedSec := (GetTickCount64 - M.Timestamp) div 1000;
+  if ElapsedSec < 5 then TimeStr := 'now'
+  else if ElapsedSec < 60 then TimeStr := IntToStr(ElapsedSec) + 's'
+  else TimeStr := IntToStr(ElapsedSec div 60) + 'm';
+  Buf.SetStringN(X + W - Length(TimeStr) - 1, Y, TimeStr, Length(TimeStr),
+    TStyle.Default.WithFg(clDarkGray));
   Inc(Y); Inc(Result);
   // Subsequent lines.
   for I := 1 to LineCount_ - 1 do begin
