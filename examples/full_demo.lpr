@@ -97,6 +97,7 @@ begin
     mkScrollUp:   ListSt.Selected := ListSt.Selected - 1;
     mkScrollDown: ListSt.Selected := ListSt.Selected + 1;
     mkDown:   SetStatus(Format('clicked at (%d,%d)', [M.X, M.Y]));
+  else
   end;
   ClampSelection;
 end;

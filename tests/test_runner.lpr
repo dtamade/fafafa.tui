@@ -29,7 +29,10 @@ uses
   test_input_parser,
   test_terminal_smoke,
   test_grapheme,
-  test_input_editor;
+  test_input_editor,
+  test_interaction,
+  test_overlay,
+  test_scrollbar;
 
 var
   Failed: Integer;
@@ -54,6 +57,9 @@ begin
   RegisterTerminalSmokeTests;
   RegisterGraphemeTests;
   RegisterInputEditorTests;
+  RegisterInteractionTests;
+  RegisterOverlayTests;
+  RegisterScrollbarTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)
