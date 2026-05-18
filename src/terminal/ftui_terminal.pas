@@ -436,13 +436,50 @@ begin
       Dec(FInputLen);
       Exit(NoneEvent);
     end;
-    // prNeedMore: fall through to wait for more bytes
+    // prNeedMore: fall through to wait for more bytes.
+    // Use a short timeout (50ms) so bare ESC resolves quickly,
+    // even when the caller passed TimeoutMs = -1 (infinite).
+    if not WaitForBytes(STDIN_FD, 50) then
+    begin
+      // No new bytes within 50ms — treat pending as complete (AtEOF).
+      R := ParseOne(FInputQueue[0], FInputLen, True, Result, Consumed);
+      if R = prSuccess then
+      begin
+        ParsedBytes := Consumed;
+        if ParsedBytes < FInputLen then
+          Move(FInputQueue[ParsedBytes], FInputQueue[0], FInputLen - ParsedBytes);
+        Dec(FInputLen, ParsedBytes);
+        PostProcessEvent(Result);
+        Exit;
+      end;
+      // Still invalid/needmore — drop and continue.
+      if FInputLen > 0 then begin
+        Move(FInputQueue[1], FInputQueue[0], FInputLen - 1);
+        Dec(FInputLen);
+      end;
+      Exit(NoneEvent);
+    end;
+    // Got new bytes — read them and retry parse below.
+    if ReadAvailableBytes > 0 then
+    begin
+      R := ParseOne(FInputQueue[0], FInputLen, False, Result, Consumed);
+      if R = prSuccess then
+      begin
+        ParsedBytes := Consumed;
+        if ParsedBytes < FInputLen then
+          Move(FInputQueue[ParsedBytes], FInputQueue[0], FInputLen - ParsedBytes);
+        Dec(FInputLen, ParsedBytes);
+        PostProcessEvent(Result);
+        Exit;
+      end;
+    end;
+    Exit(NoneEvent);
   end;
 
   CheckSignals(Resz, HasResize);
   if HasResize then Exit(Resz);
 
-  // 2. Wait for new bytes.  EINTR will trip the SIGWINCH handler.
+  // 2. Wait for new bytes (no pending — use caller's timeout).
   if not WaitForBytes(STDIN_FD, TimeoutMs) then
   begin
     CheckSignals(Resz, HasResize);
