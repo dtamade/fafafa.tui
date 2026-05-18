@@ -257,11 +257,21 @@ begin
     RowsUsed := RenderMessage(Frame.Buffer, Msgs[I], MsgArea.X, Y, MsgArea.Width);
     Inc(Y, RowsUsed); Inc(I);
   end;
-  // Welcome if empty.
+  // Welcome banner if empty (centered, like cli888 first launch).
   if MsgCount = 0 then begin
-    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 1, 'Welcome to cli888', Theme.UserLabel);
-    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 3, 'Type a message and press Enter.', Theme.SecondaryText);
-    Frame.Buffer.SetString(MsgArea.X + 2, MsgArea.Y + 4, 'Try / for commands, Ctrl+P for palette.', Theme.SecondaryText);
+    J := MsgArea.Height div 3;
+    Frame.Buffer.SetStringN(
+      MsgArea.X + (MsgArea.Width - 7) div 2, MsgArea.Y + J,
+      'cli888', MsgArea.Width, Theme.AiLabel);
+    Frame.Buffer.SetStringN(
+      MsgArea.X + (MsgArea.Width - 34) div 2, MsgArea.Y + J + 2,
+      'AI-powered terminal assistant', MsgArea.Width, Theme.SecondaryText);
+    Frame.Buffer.SetStringN(
+      MsgArea.X + (MsgArea.Width - 45) div 2, MsgArea.Y + J + 4,
+      'Type a message and press Enter to get started.', MsgArea.Width, Theme.MutedText);
+    Frame.Buffer.SetStringN(
+      MsgArea.X + (MsgArea.Width - 40) div 2, MsgArea.Y + J + 5,
+      '/ for commands, Ctrl+C to quit.', MsgArea.Width, Theme.MutedText);
   end;
 
   // === Bottom pane box ===
@@ -305,18 +315,21 @@ begin
     Inc(CurY);
   end;
 
-  // Input surface — delegate to TInputEditor.
+  // Input surface — prompt + TInputEditor.
   for I := 0 to InputHeight - 1 do begin
     Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
     Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
   end;
   Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default.WithBg(Theme.BgInput));
-  Editor.Render(TRect.Make(InnerX + 1, CurY, InnerW - 1, InputHeight), Frame.Buffer,
+  // Prompt indicator on first line.
+  Frame.Buffer.SetStringN(InnerX + 1, CurY, '> ', 2, Theme.UserLabel.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+  // Editor content starts after prompt.
+  Editor.Render(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight), Frame.Buffer,
     Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
     Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
     PLACEHOLDER);
   Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
-  Frame.CursorPos := Editor.CursorScreenPos(TRect.Make(InnerX + 1, CurY, InnerW - 1, InputHeight));
+  Frame.CursorPos := Editor.CursorScreenPos(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight));
   Inc(CurY, InputHeight);
 
   // Separator before status.
@@ -427,8 +440,6 @@ begin
   ToolStatusLine := '';
   ModelName := 'claude-opus-4-7';
   CwdPath := '~/projects/fafafa.tui';
-
-  AddMsg(mrSystem, 'Welcome to cli888. Type a message and press Enter.');
 
   Term := TTerminal.Create;
   try
