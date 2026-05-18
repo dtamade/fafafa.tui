@@ -50,7 +50,6 @@
 | `ftui_ansi_backend` | TAnsiBackend — Terminal 内部使用 |
 | `ftui_test_backend` | TTestBackend — 仅测试用 |
 | `ftui_termios` | termios 绑定 — Terminal 内部 |
-| `ftui_terminal` | TTerminal — 重构完成，overlay/capture/session 已集成 |
 | `ftui_input_parser` | ParseOne — Terminal 内部使用 |
 
 ## 版本承诺

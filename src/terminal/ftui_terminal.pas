@@ -84,6 +84,7 @@ type
     procedure CheckSignals(out ResizeOut: TEvent; out HasResize: Boolean);
     procedure ResizeBuffersTo(W, H: Word);
     procedure DetectCapabilities;
+    procedure PostProcessEvent(var Ev: TEvent);
   public
     constructor Create;
     destructor Destroy; override;
@@ -366,6 +367,33 @@ begin
   end;
 end;
 
+
+// Post-process a successfully parsed event: update PrevMousePos,
+// handle Esc-cancel-session, auto-release capture on MouseUp.
+procedure TTerminal.PostProcessEvent(var Ev: TEvent);
+begin
+  case Ev.Kind of
+    evMouse:
+      begin
+        FPrevMousePos.X := Ev.Mouse.X;
+        FPrevMousePos.Y := Ev.Mouse.Y;
+        // Auto-release capture on MouseUp.
+        if (Ev.Mouse.Kind = mkUp) and FCapture.Active then
+        begin
+          if FSession.IsActive then FSession.Commit;
+          FCapture.Release;
+        end;
+      end;
+    evKey:
+      // Esc cancels active session + releases capture.
+      if (Ev.Key.Code = kcEsc) and FSession.IsActive then
+      begin
+        FSession.Cancel;
+        FCapture.Release;
+      end;
+  end;
+end;
+
 function TTerminal.PollEvent(TimeoutMs: Integer): TEvent;
 var
   Consumed: Integer;
@@ -388,6 +416,7 @@ begin
       if ParsedBytes < FInputLen then
         Move(FInputQueue[ParsedBytes], FInputQueue[0], FInputLen - ParsedBytes);
       Dec(FInputLen, ParsedBytes);
+      PostProcessEvent(Result);
       Exit;
     end
     else if R = prInvalid then
@@ -424,6 +453,7 @@ begin
     if ParsedBytes < FInputLen then
       Move(FInputQueue[ParsedBytes], FInputQueue[0], FInputLen - ParsedBytes);
     Dec(FInputLen, ParsedBytes);
+    PostProcessEvent(Result);
     Exit;
   end
   else if R = prInvalid then

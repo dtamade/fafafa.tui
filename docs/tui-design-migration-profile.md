@@ -85,9 +85,9 @@ TInvalidation = set of (
 ## 3. Pointer Capture 合同
 
 ```pascal
-TTerminal.SetCapture(Target: Pointer);   // 开始捕获
-TTerminal.ReleaseCapture;                // 释放捕获
-TTerminal.HasCapture: Boolean;           // 查询状态
+TTerminal.Capture.Acquire(Target, Button);  // 开始捕获
+TTerminal.Capture.Release;                   // 释放捕获
+TTerminal.Capture.Active: Boolean;            // 查询状态
 ```
 
 **行为**：
@@ -99,8 +99,7 @@ TTerminal.HasCapture: Boolean;           // 查询状态
 ## 4. Hover/Leave 合同
 
 ```pascal
-TTerminal.HoverTarget: Pointer;          // 当前 hover 的目标
-TTerminal.PrevMousePos: TPosition;       // 上一帧鼠标位置
+TTerminal.PrevMousePos: TPosition;            // 上一帧鼠标位置（自动更新）
 ```
 
 **消费方判断逻辑**：
@@ -112,7 +111,7 @@ TTerminal.PrevMousePos: TPosition;       // 上一帧鼠标位置
 
 ```pascal
 function HitTest(const Area: TRect; const Ev: TMouseEvent): Boolean;
-function HoverChanged(const Area: TRect; Prev, Curr: TPosition): THoverChange;
+function DetectHoverChange(const Area: TRect; Prev, Curr: TPosition): THoverChange;
 // THoverChange = (hcNone, hcEntered, hcLeft, hcStay)
 ```
 
