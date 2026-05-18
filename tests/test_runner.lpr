@@ -18,7 +18,10 @@ uses
   test_buffer,
   test_bytes,
   test_ansi,
-  test_ansi_backend;
+  test_ansi_backend,
+  test_text,
+  test_layout,
+  test_test_backend;
 
 var
   Failed: Integer;
@@ -32,6 +35,9 @@ begin
   RegisterBytesTests;
   RegisterAnsiTests;
   RegisterAnsiBackendTests;
+  RegisterTextTests;
+  RegisterLayoutTests;
+  RegisterTestBackendTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

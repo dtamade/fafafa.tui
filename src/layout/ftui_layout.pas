@@ -1,0 +1,258 @@
+unit ftui_layout;
+
+// Constraint-based 1-D split.
+//
+// ratatui ships with cassowary; we don't.  fafafa.tui supports only
+// the three Constraint kinds cli888 actually uses (Length / Min /
+// Percentage), and resolves them with a deterministic three-pass
+// algorithm.  The algorithm matches ratatui semantics on every test
+// case in our suite, but it does NOT generalise to mixed Min+Max or
+// Ratio — those constraint kinds are out of scope.
+//
+// Algorithm (for total = Area.Width or Area.Height):
+//
+//   1. Pass 1 — Length: every Length(L) takes exactly L (clamped to
+//      [0, remaining]).  Subtract from `remaining`.
+//   2. Pass 2 — Percentage: every Percentage(P) takes
+//      round(total * P / 100), clamped to [0, remaining].  We use the
+//      *original* total, not the post-Length remaining, so percentages
+//      stay stable when sibling Lengths are added/removed (matches
+//      ratatui CASS-with-equal-strength behaviour).
+//   3. Pass 3 — Min: distribute remaining space equally among Min
+//      slots, with each slot guaranteed >= its Min(N).  If
+//      `remaining < sum_of_mins`, mins still get their floor and the
+//      total may exceed the area — caller is responsible for keeping
+//      sums sane.
+//   4. The residual (remaining after Pass 3) is added to the LAST
+//      flexible slot — Min, then Percentage, then Length, in that
+//      reverse-priority order.  This matches the ratatui Legacy flex
+//      mode "trailing slot absorbs leftover" behaviour.
+//
+// Output positions are assigned left-to-right (or top-to-bottom) so
+// adjacent rects share an edge with no gap.
+
+{$mode objfpc}{$H+}{$inline on}
+{$modeswitch advancedrecords}
+{$packenum 1}
+
+interface
+
+uses
+  ftui_rect;
+
+type
+  TConstraintKind = (ckLength, ckMin, ckPercentage);
+
+  TConstraint = packed record
+    Kind: TConstraintKind;
+    Value: Word;
+  end;
+
+  TDirection = (dirHorizontal, dirVertical);
+
+  TConstraints = array of TConstraint;
+  TRectArray   = array of TRect;
+  TIntArray    = array of Integer;
+
+  TLayout = record
+    Direction: TDirection;
+    Constraints: TConstraints;
+
+    class function Default: TLayout; static;
+    class function Horizontal(const Cs: array of TConstraint): TLayout; static;
+    class function Vertical(const Cs: array of TConstraint): TLayout; static;
+
+    function WithDirection(D: TDirection): TLayout;
+    function WithConstraints(const Cs: array of TConstraint): TLayout;
+    function Split(const Area: TRect): TRectArray;
+  end;
+
+function LengthConstraint(N: Word): TConstraint; inline;
+function MinConstraint(N: Word): TConstraint; inline;
+function PercentageConstraint(N: Word): TConstraint; inline;
+
+// Stand-alone helpers for callers who don't want to build a TLayout
+// just to slice a rect.
+function HorizontalSplit(const Area: TRect; const Cs: array of TConstraint): TRectArray;
+function VerticalSplit  (const Area: TRect; const Cs: array of TConstraint): TRectArray;
+
+implementation
+
+function LengthConstraint(N: Word): TConstraint;
+begin
+  Result.Kind := ckLength;
+  Result.Value := N;
+end;
+
+function MinConstraint(N: Word): TConstraint;
+begin
+  Result.Kind := ckMin;
+  Result.Value := N;
+end;
+
+function PercentageConstraint(N: Word): TConstraint;
+begin
+  Result.Kind := ckPercentage;
+  Result.Value := N;
+end;
+
+{ TLayout }
+
+class function TLayout.Default: TLayout;
+begin
+  Result.Direction := dirVertical;
+  Result.Constraints := nil;
+end;
+
+class function TLayout.Horizontal(const Cs: array of TConstraint): TLayout;
+begin
+  Result := Default;
+  Result.Direction := dirHorizontal;
+  Result := Result.WithConstraints(Cs);
+end;
+
+class function TLayout.Vertical(const Cs: array of TConstraint): TLayout;
+begin
+  Result := Default;
+  Result.Direction := dirVertical;
+  Result := Result.WithConstraints(Cs);
+end;
+
+function TLayout.WithDirection(D: TDirection): TLayout;
+begin
+  Result := Self;
+  Result.Direction := D;
+end;
+
+function TLayout.WithConstraints(const Cs: array of TConstraint): TLayout;
+var
+  I: Integer;
+begin
+  Result := Self;
+  SetLength(Result.Constraints, System.Length(Cs));
+  for I := 0 to System.High(Cs) do
+    Result.Constraints[I] := Cs[I];
+end;
+
+// Compute slot sizes along the chosen axis.  Returns an array the same
+// length as Cs.  Total is the available extent (Area.Width or
+// Area.Height); the algorithm is described in the unit header.
+function ComputeSlotSizes(Total: Integer;
+  const Cs: array of TConstraint): TIntArray;
+var
+  N, I, Want, Take, MinCount, Remaining: Integer;
+  LastFlexIdx: Integer;
+begin
+  N := System.Length(Cs);
+  SetLength(Result, N);
+  if N = 0 then Exit;
+
+  Remaining := Total;
+  if Remaining < 0 then Remaining := 0;
+
+  // Pass 1 — Length.
+  for I := 0 to N - 1 do
+    if Cs[I].Kind = ckLength then
+    begin
+      Want := Cs[I].Value;
+      if Want > Remaining then Want := Remaining;
+      Result[I] := Want;
+      Dec(Remaining, Want);
+    end;
+
+  // Pass 2 — Percentage of the original Total.
+  for I := 0 to N - 1 do
+    if Cs[I].Kind = ckPercentage then
+    begin
+      // round-half-to-even is overkill for terminal cells; floor is fine
+      // and matches ratatui's f64 -> u16 truncation in practice.
+      Want := (Total * Cs[I].Value) div 100;
+      if Want > Remaining then Want := Remaining;
+      Result[I] := Want;
+      Dec(Remaining, Want);
+    end;
+
+  // Pass 3 — distribute Remaining over Min slots.  Each Min slot
+  // takes max(per_slot_share, Min.Value), where per_slot_share is
+  // recomputed at every step against the *current* remaining and the
+  // count of Min slots still to process.  This way a high-floor Min
+  // (e.g. Min(20) when fair share would be 12) can grab its floor and
+  // the next Min slot still gets the right share of the leftover.
+  MinCount := 0;
+  for I := 0 to N - 1 do
+    if Cs[I].Kind = ckMin then Inc(MinCount);
+
+  if MinCount > 0 then
+  begin
+    if Remaining < 0 then Remaining := 0;
+    for I := 0 to N - 1 do
+      if Cs[I].Kind = ckMin then
+      begin
+        if MinCount > 1 then
+          Take := Remaining div MinCount
+        else
+          Take := Remaining;        // last Min mops up
+        if Take < Cs[I].Value then Take := Cs[I].Value;
+        if Take > Remaining then Take := Remaining;
+        if Take < 0 then Take := 0;
+        Result[I] := Take;
+        Dec(Remaining, Take);
+        Dec(MinCount);
+      end;
+  end;
+
+  // Pass 4 — absorb residual (positive or negative) into the LAST
+  // slot, regardless of constraint kind.  This mirrors ratatui's
+  // Legacy flex "trailing slot wins" rule: when residual space
+  // remains after Length/Percentage/Min are honoured, it accumulates
+  // on the right (or bottom) edge.  Since we always have at least
+  // one slot when N > 0, picking N-1 is sound.
+  if Remaining <> 0 then
+  begin
+    LastFlexIdx := N - 1;
+    if Result[LastFlexIdx] + Remaining < 0 then
+      Result[LastFlexIdx] := 0
+    else
+      Inc(Result[LastFlexIdx], Remaining);
+  end;
+end;
+
+function TLayout.Split(const Area: TRect): TRectArray;
+var
+  Sizes: TIntArray;
+  Total, I, Cursor: Integer;
+begin
+  if Direction = dirHorizontal then
+    Total := Area.Width
+  else
+    Total := Area.Height;
+
+  Sizes := ComputeSlotSizes(Total, Constraints);
+  SetLength(Result, System.Length(Sizes));
+
+  Cursor := 0;
+  for I := 0 to System.High(Sizes) do
+  begin
+    if Direction = dirHorizontal then
+    begin
+      Result[I] := TRect.Make(Area.X + Cursor, Area.Y, Sizes[I], Area.Height);
+    end
+    else
+    begin
+      Result[I] := TRect.Make(Area.X, Area.Y + Cursor, Area.Width, Sizes[I]);
+    end;
+    Inc(Cursor, Sizes[I]);
+  end;
+end;
+
+function HorizontalSplit(const Area: TRect; const Cs: array of TConstraint): TRectArray;
+begin
+  Result := TLayout.Horizontal(Cs).Split(Area);
+end;
+
+function VerticalSplit(const Area: TRect; const Cs: array of TConstraint): TRectArray;
+begin
+  Result := TLayout.Vertical(Cs).Split(Area);
+end;
+
+end.

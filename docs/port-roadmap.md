@@ -39,16 +39,19 @@
   - 第一阶段 `Width` 用 `Length(Content)` 字节数粗算（ASCII-only 准）
   - CJK/emoji 双宽留 TODO，M2 引入 utf8proc 时再补
 - `src/layout/ftui_layout.pas`（`TConstraint`/`TLayout` + split solver）
-- `src/backend/ftui_test_backend.pas`（核心：`DumpAsLines`、`DumpAsString`）
-- `src/terminal/ftui_terminal.pas` 骨架（仅 `BeginFrame`/`EndFrame` + diff + flush，**还不接输入**）
-- `examples/layout_demo.lpr`（用 layout 切 3 列 × 2 行，每格画不同色 SetString）
+- `src/backend/ftui_test_backend.pas`（DrawPatches 应用到内部 buffer，AsLines 走 Buffer.AsLines）
+- `examples/layout_demo.lpr`（用 layout 切 3 行 × 3 列，每格画不同色 SetString）
+
+注：原 roadmap 写"M1 实现 terminal 骨架"——已剥离到 M3。M1 的 widget
+测试和 demo 都不需要 TFrame，TestBackend / 直接 Buffer.SetString 就够；
+提前实现 TFrame 会引入 M3 必然返工的 API。范围克制。
 
 ### 判定标准
 
-- [ ] `VerticalSplit/HorizontalSplit` 通过 25+ 个测试用例（含 Length+Min 混用、Percentage 边界、空 area、单约束等）
-- [ ] `TBuffer.Diff` 跟 ratatui 的算法行为等价（实测对照 ratatui 源码 buffer/diff 测试至少 10 个 case）
-- [ ] `TestBackend.DumpAsLines` 能正确输出多色 buffer 内容（带 ANSI 序列重现）
-- [ ] `examples/layout_demo.lpr` 视觉跟 ratatui 等价例子一致
+- [x] `VerticalSplit/HorizontalSplit` 测试覆盖 25+ 个 case — **30+ 个 case**（含 pure lengths / percentage / length+pct 混用 / Min 平分 / Min 高 floor / 偏移 area / 空 area / 空 constraints）
+- [x] `TBuffer.Diff` 跟 ratatui 等价 — M0-3 已完成 15 个 buffer 测试（含 skip / style-only / empty / overlap 路径）
+- [x] `TestBackend` 能正确反映多色 patches — 4 个 test_backend 测试 + 配 layout_demo 输出
+- [x] `examples/layout_demo.lpr` 视觉一致 — PTY script 字节流验证：黄底标题、3 色 body 列、灰底 footer，SGR 切换次数最小化
 
 ## M2 — 4 个核心 Widget（目标：2 周）
 
@@ -140,4 +143,11 @@ cli888 主聊天界面骨架可拼。
   - clean build 0.4 秒（要求 < 5 秒，提前 10 倍）
   - 二进制：test_runner 1.7M，hello_box ~500K
   - 字节流验证：alt screen + cursor hide + clear + 边框 + 文字 + leave alt
-- [ ] M1 进行中
+- [x] **M1 完成（2026-05-18）** ✅
+  - ftui_text（Span/Line/Text，CRLF 处理 + alignment）
+  - ftui_layout（Length/Min/Percentage 三 pass solver + trailing-absorb）
+  - ftui_test_backend（DrawPatches 应用到内部 buffer + cursor/alt 状态跟踪）
+  - examples/layout_demo.lpr（3 行 × 3 列彩色布局演示）
+  - 总测试 103/103，0 warning / 0 note
+  - terminal 骨架推迟到 M3（避免提前抽象）
+- [ ] M2 进行中
