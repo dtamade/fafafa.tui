@@ -42,7 +42,6 @@ uses
   ftui_paragraph,
   ftui_clear,
   ftui_grapheme,
-  ftui_theme,
   ftui_input_editor,
   ftui_event,
   ftui_terminal;
@@ -89,7 +88,6 @@ type
 
 var
   Term: TTerminal;
-  Theme: TTheme;
   Msgs: array[0..MAX_MSGS - 1] of TMsg;
   MsgCount: Integer;
   Editor: TInputEditor;
@@ -180,10 +178,10 @@ end;
 procedure RenderSeparator(Buf: TBuffer; X, Y, W: Integer);
 var I: Integer;
 begin
-  Buf.SetStringN(X, Y, BorderLeftT, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Buf.SetStringN(X, Y, BorderLeftT, 1, TStyle.Default.WithFg(clDarkGray));
   for I := X + 1 to X + W - 2 do
-    Buf.SetStringN(I, Y, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-  Buf.SetStringN(X + W - 1, Y, BorderRightT, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Buf.SetStringN(I, Y, BorderHorizontal, 1, TStyle.Default.WithFg(clDarkGray));
+  Buf.SetStringN(X + W - 1, Y, BorderRightT, 1, TStyle.Default.WithFg(clDarkGray));
 end;
 
 function RenderMessage(Buf: TBuffer; const M: TMsg; X, Y, W: Integer): Integer;
@@ -265,7 +263,7 @@ begin
 
   // === Messages ===
   Y := MsgArea.Y + MsgArea.Height;
-  I := MsgCount - 1 + ScrollOffset;
+  I := MsgCount - 1 - ScrollOffset;
   if I >= MsgCount then I := MsgCount - 1;
   while (I >= 0) and (Y > MsgArea.Y) do begin
     RowsUsed := 1;
@@ -283,16 +281,16 @@ begin
     J := MsgArea.Height div 3;
     Frame.Buffer.SetStringN(
       MsgArea.X + (MsgArea.Width - 7) div 2, MsgArea.Y + J,
-      'cli888', MsgArea.Width, Theme.AiLabel);
+      'cli888', MsgArea.Width, TStyle.Default.WithFg(clGreen).WithModifier([mbBold]));
     Frame.Buffer.SetStringN(
       MsgArea.X + (MsgArea.Width - 34) div 2, MsgArea.Y + J + 2,
-      'AI-powered terminal assistant', MsgArea.Width, Theme.SecondaryText);
+      'AI-powered terminal assistant', MsgArea.Width, TStyle.Default.WithFg(clGray));
     Frame.Buffer.SetStringN(
       MsgArea.X + (MsgArea.Width - 45) div 2, MsgArea.Y + J + 4,
-      'Type a message and press Enter to get started.', MsgArea.Width, Theme.MutedText);
+      'Type a message and press Enter to get started.', MsgArea.Width, TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]));
     Frame.Buffer.SetStringN(
       MsgArea.X + (MsgArea.Width - 40) div 2, MsgArea.Y + J + 5,
-      '/ for commands, Ctrl+C to quit.', MsgArea.Width, Theme.MutedText);
+      '/ for commands, Ctrl+C to quit.', MsgArea.Width, TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]));
   end;
 
   // === Bottom pane box ===
@@ -301,18 +299,18 @@ begin
   CurY := BottomBox.Y;
 
   // Top border: ╭─────╮
-  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedTL, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedTL, 1, TStyle.Default.WithFg(clDarkGray));
   for I := 1 to Integer(BottomBox.Width) - 2 do
-    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedTR, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(clDarkGray));
+  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedTR, 1, TStyle.Default.WithFg(clDarkGray));
   Inc(CurY);
 
   // Host surface (tool status / slash menu).
   if HostHeight > 0 then begin
     // Left/right vertical borders for host rows.
     for I := 0 to HostHeight - 1 do begin
-      Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-      Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+      Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
+      Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
     end;
     if State = asSlashMenu then begin
       // Render slash menu items.
@@ -322,14 +320,14 @@ begin
         else
           Sp := '   ';
         Frame.Buffer.SetStringN(InnerX, CurY + I, Sp + SLASH_CMDS[I, 0], 14,
-          TStyle.Default.WithFg(Theme.AccentTool).WithBg(Theme.BgInput));
+          TStyle.Default.WithFg(clYellow));
         Frame.Buffer.SetStringN(InnerX + 14, CurY + I, SLASH_CMDS[I, 1], InnerW - 14,
-          TStyle.Default.WithFg(Theme.FgSecondary).WithBg(Theme.BgInput));
+          TStyle.Default.WithFg(clDarkGray));
       end;
     end else begin
       // Tool status line.
       Frame.Buffer.SetStringN(InnerX, CurY, ' ' + ToolStatusLine, InnerW,
-        TStyle.Default.WithFg(Theme.StatusInfo).WithBg(Theme.BgInput));
+        TStyle.Default.WithFg(clCyan));
     end;
     Inc(CurY, HostHeight);
     RenderSeparator(Frame.Buffer, BottomBox.X, CurY, BottomBox.Width);
@@ -338,16 +336,16 @@ begin
 
   // Input surface — prompt + TInputEditor.
   for I := 0 to InputHeight - 1 do begin
-    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
+    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
   end;
-  Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default.WithBg(Theme.BgInput));
+  Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default);
   // Prompt indicator on first line.
-  Frame.Buffer.SetStringN(InnerX + 1, CurY, '> ', 2, Theme.UserLabel.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+  Frame.Buffer.SetStringN(InnerX + 1, CurY, '> ', 2, TStyle.Default.WithFg(clCyan).WithModifier([mbBold]).Patch(TStyle.Default));
   // Editor content starts after prompt.
   Editor.Render(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight), Frame.Buffer,
-    Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
-    Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)),
+    TStyle.Default.Patch(TStyle.Default),
+    TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]).Patch(TStyle.Default),
     PLACEHOLDER);
   Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
   Frame.CursorPos := Editor.CursorScreenPos(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight));
@@ -359,16 +357,16 @@ begin
 
   // Status surface (2 rows).
   for I := 0 to StatusHeight - 1 do begin
-    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-    Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY + I, InnerW, 1), Theme.StatusBarStyle);
+    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
+    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(clDarkGray));
+    Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY + I, InnerW, 1), TStyle.Default.WithFg(clDarkGray));
   end;
   // Row 1: CWD + model.
   StatusLeft := ' ' + CwdPath;
   StatusRight := ModelName + ' ';
-  Frame.Buffer.SetStringN(InnerX, CurY, StatusLeft, InnerW, Theme.StatusBarStyle);
+  Frame.Buffer.SetStringN(InnerX, CurY, StatusLeft, InnerW, TStyle.Default.WithFg(clDarkGray));
   Frame.Buffer.SetStringN(InnerX + InnerW - Length(StatusRight), CurY, StatusRight, Length(StatusRight),
-    TStyle.Default.WithBg(Theme.BgSecondary).WithFg(Theme.FgPrimary).WithModifier([mbBold]));
+    TStyle.Default.WithFg(clWhite).WithModifier([mbBold]));
   Inc(CurY);
   // Row 2: hints + state.
   HintLeft := ' Enter send  / cmds  Ctrl+C quit';
@@ -378,16 +376,16 @@ begin
     asStreaming: StateRight := SPINNER[SpinnerTick mod 10] + ' Streaming ';
     asSlashMenu: StateRight := '/ Menu ';
   end;
-  Frame.Buffer.SetStringN(InnerX, CurY, HintLeft, InnerW, Theme.StatusBarStyle);
+  Frame.Buffer.SetStringN(InnerX, CurY, HintLeft, InnerW, TStyle.Default.WithFg(clDarkGray));
   Frame.Buffer.SetStringN(InnerX + InnerW - Length(StateRight), CurY, StateRight, Length(StateRight),
-    TStyle.Default.WithBg(Theme.BgSecondary).WithFg(Theme.StatusInfo));
+    TStyle.Default.WithFg(clCyan));
   Inc(CurY);
 
   // Bottom border: ╰─────╯
-  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedBL, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderRoundedBL, 1, TStyle.Default.WithFg(clDarkGray));
   for I := 1 to Integer(BottomBox.Width) - 2 do
-    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedBR, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStringN(BottomBox.X + I, CurY, BorderHorizontal, 1, TStyle.Default.WithFg(clDarkGray));
+  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderRoundedBR, 1, TStyle.Default.WithFg(clDarkGray));
 
   Term.EndFrame(Frame);
 end;
@@ -485,7 +483,6 @@ end;
 var
   Ev: TEvent;
 begin
-  Theme := ThemeDefaultDark;
   MsgCount := 0;
   Editor := TInputEditor.CreateWithMaxLines(4);
   State := asIdle; ResponseIdx := 0; TokenCount := 0;

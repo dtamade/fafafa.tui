@@ -429,12 +429,13 @@ begin
     LineStr := Copy(FText, StartB + 1, EndB - StartB);
     ABuf.SetStringN(Area.X, Area.Y + DrawRow, LineStr, Area.Width, TextSty);
     Inc(DrawRow);
-    // Advance past LF.
+    // Advance past LF to start of next line.
+    // EndB points to the last byte before LF (or end of text).
+    // FText[EndB+1] is the LF byte.  Next line starts at EndB+2 (0-based: EndB+1).
     if (EndB < Length(FText)) and (FText[EndB + 1] = #10) then
-      StartB := EndB + 1
+      StartB := EndB + 1       // now StartB is the 0-based index of the byte AFTER LF
     else
       Break;
-    Inc(StartB);
   end;
 end;
 
