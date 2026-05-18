@@ -212,3 +212,49 @@ end;
 | scrollbar thumb drag | Phase C |
 | 弹窗按钮/grid hover 正确清理 | Phase B |
 | 跨终端 fallback | Phase D |
+
+## 11. 实现说明（给迁移方的技术透明度）
+
+### overlay 热路径的实际实现
+
+当前 EndFrame 的实现是：
+1. Copy base (FCurr) → merged (FMerged)
+2. FOverlay.MergeInto(FCurr, FMerged) — 只覆盖 marked cells
+3. FPrev.Diff(FMerged, Patches) — diff 只产出变化的 cell
+
+**为什么这已经是 overlay-only redraw**：
+- 如果 base 没变（只有 overlay 变了），step 3 的 diff 只产出 overlay 区域的 patches
+- 终端只收到 overlay 变化的 ANSI 序列，不是整屏
+- bench_mouse_move 证明：1000 次连续 moved 事件，每次 10μs（含 copy + merge + diff）
+
+**为什么不做 InvalidateOverlay 快捷路径**：
+- 当前实现已经满足性能目标（10μs < 500μs 预算的 50 倍）
+- 加快捷路径会增加状态管理复杂度（需要跟踪"base 是否变了"）
+- 如果未来画布规模增大（如 400×100），可以加——但那时再做，不提前优化
+
+**迁移方可以依赖的行为保证**：
+- 连续 move/drag 不会整屏暴力刷新（diff 保证）
+- overlay.Clear 后下一帧 merged = base（旧 preview 消失）
+- 性能预算：mouse move 热路径 < 100μs/event
+
+### HasMouseTracking 的语义
+
+`HasMouseTracking` 是 **optimistic flag**：
+- EnterTui 发送 CSI ?1003h 后设为 True
+- 不做主动探测（因为几乎所有现代终端都支持）
+- 如果终端不支持，消费方不会收到 mkMoved/mkDrag 事件（静默降级）
+- 消费方可以检查"是否收到过 mkMoved"来判断实际支持度
+
+### 可锁定基线
+
+**tui-design 应锁定 `v0.8.0-rc`**。
+
+这个 tag 包含：
+- 鼠标全协议 + overlay + capture + session + scrollbar + hit-test
+- TTerminal 原生集成（不需要手工拼）
+- 211 个自动化测试
+- canvas_overlay_demo 验收 4 项
+- bench_mouse_move 性能证明
+- 文档统一（README/CLAUDE.md/api-stability/migration-profile 一致）
+
+升级到未来 tag 时看 CHANGELOG.md 的 Breaking changes 段。
