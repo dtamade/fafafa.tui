@@ -42,6 +42,7 @@ uses
 type
   TBlock = record
     Borders: TBorders;
+    BorderSet_: TBorderSet;
     HasTitle: Boolean;
     Title: AnsiString;
     Style: TStyle;
@@ -51,6 +52,7 @@ type
     class function Default: TBlock; static;
 
     function WithBorders(B: TBorders): TBlock;
+    function WithBorderSet(const BS: TBorderSet): TBlock;
     function WithTitle(const T: AnsiString): TBlock;
     function WithStyle(const S: TStyle): TBlock;
     function WithBorderStyle(const S: TStyle): TBlock;
@@ -65,6 +67,7 @@ implementation
 class function TBlock.Default: TBlock;
 begin
   Result.Borders := [];
+  Result.BorderSet_ := BorderSetPlain;
   Result.HasTitle := False;
   Result.Title := '';
   Result.Style := TStyle.Default;
@@ -76,6 +79,12 @@ function TBlock.WithBorders(B: TBorders): TBlock;
 begin
   Result := Self;
   Result.Borders := B;
+end;
+
+function TBlock.WithBorderSet(const BS: TBorderSet): TBlock;
+begin
+  Result := Self;
+  Result.BorderSet_ := BS;
 end;
 
 function TBlock.WithTitle(const T: AnsiString): TBlock;
@@ -135,30 +144,29 @@ begin
   // Step 2: edges.
   if bsTop in Borders then
     for X := Clip.X to RightX do
-      PaintGlyph(ABuf, X, Clip.Y, BorderHorizontal, BorderStyle);
+      PaintGlyph(ABuf, X, Clip.Y, BorderSet_.Horizontal, BorderStyle);
 
   if bsBottom in Borders then
     for X := Clip.X to RightX do
-      PaintGlyph(ABuf, X, BottomY, BorderHorizontal, BorderStyle);
+      PaintGlyph(ABuf, X, BottomY, BorderSet_.Horizontal, BorderStyle);
 
   if bsLeft in Borders then
     for Y := Clip.Y to BottomY do
-      PaintGlyph(ABuf, Clip.X, Y, BorderVertical, BorderStyle);
+      PaintGlyph(ABuf, Clip.X, Y, BorderSet_.Vertical, BorderStyle);
 
   if bsRight in Borders then
     for Y := Clip.Y to BottomY do
-      PaintGlyph(ABuf, RightX, Y, BorderVertical, BorderStyle);
+      PaintGlyph(ABuf, RightX, Y, BorderSet_.Vertical, BorderStyle);
 
-  // Step 3: corners.  Drawn only where two adjacent borders meet, so a
-  // partial border (e.g. just bottom) doesn't grow phantom corners.
+  // Step 3: corners.
   if (bsTop in Borders) and (bsLeft in Borders) then
-    PaintGlyph(ABuf, Clip.X, Clip.Y, BorderTopLeft, BorderStyle);
+    PaintGlyph(ABuf, Clip.X, Clip.Y, BorderSet_.TopLeft, BorderStyle);
   if (bsTop in Borders) and (bsRight in Borders) then
-    PaintGlyph(ABuf, RightX, Clip.Y, BorderTopRight, BorderStyle);
+    PaintGlyph(ABuf, RightX, Clip.Y, BorderSet_.TopRight, BorderStyle);
   if (bsBottom in Borders) and (bsLeft in Borders) then
-    PaintGlyph(ABuf, Clip.X, BottomY, BorderBottomLeft, BorderStyle);
+    PaintGlyph(ABuf, Clip.X, BottomY, BorderSet_.BottomLeft, BorderStyle);
   if (bsBottom in Borders) and (bsRight in Borders) then
-    PaintGlyph(ABuf, RightX, BottomY, BorderBottomRight, BorderStyle);
+    PaintGlyph(ABuf, RightX, BottomY, BorderSet_.BottomRight, BorderStyle);
 
   // Step 4: title.  Sits on the top row, indented one cell past a
   // left border if present.  Width clipped to remaining cells before
