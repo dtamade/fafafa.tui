@@ -205,12 +205,15 @@ begin
   Result := 0;
   if W <= 4 then Exit;
   case M.Role of
-    mrUser:    begin Indicator := ' ' + SYM_USER + ' '; IndSty := Theme.UserLabel; ContentSty := Theme.PrimaryText; BgSty := TStyle.Default.WithBg(Theme.BgPrimary); end;
+    mrUser:    begin Indicator := ' ' + SYM_USER + ' '; IndSty := Theme.UserLabel; ContentSty := Theme.PrimaryText; BgSty := TStyle.Default; end;
     mrAI:      begin Indicator := ' ' + SYM_AI + ' '; IndSty := Theme.AiLabel; ContentSty := TStyle.Default.WithFg(Theme.FgPrimary); BgSty := TStyle.Default.WithBg(Theme.BgAiMsg); end;
-    mrTool:    begin Indicator := '  ' + SYM_TOOL + ' '; IndSty := Theme.ToolLabel; ContentSty := TStyle.Default.WithFg(Theme.StatusSuccess); BgSty := TStyle.Default.WithBg(Theme.BgPrimary); end;
+    mrTool:    begin Indicator := '  ' + SYM_TOOL + ' '; IndSty := Theme.ToolLabel; ContentSty := TStyle.Default.WithFg(Theme.StatusSuccess); BgSty := TStyle.Default; end;
     mrSystem:  begin Indicator := ' ' + SYM_SYSTEM + ' '; IndSty := Theme.SystemLabel; ContentSty := TStyle.Default.WithFg(Theme.AccentBrand); BgSty := TStyle.Default.WithBg(Theme.BgSystem); end;
     mrThinking:begin Indicator := ' ' + SYM_THINK + ' '; IndSty := Theme.InfoLabel; ContentSty := Theme.MutedText; BgSty := TStyle.Default.WithBg(Theme.BgThinking); end;
   end;
+  // Only AI/System/Thinking get a background color block.
+  // User and Tool messages use terminal default background (no bg set).
+
   // AI top padding.
   if M.Role = mrAI then begin Buf.SetStyle(TRect.Make(X, Y, W, 1), BgSty); Inc(Y); Inc(Result); end;
   // Split content.
@@ -241,17 +244,23 @@ var
   Frame: TFrame;
   MsgArea, BottomBox: TRect;
   HostHeight, InputHeight, StatusHeight, SepCount, BottomHeight: Integer;
-  InnerX, InnerW, CurY, I, J, Y, RowsUsed: Integer;
+  InnerX, InnerW, CurY, I, J, Y, RowsUsed, SliceStart: Integer;
   Sp, StatusLeft, StatusRight, HintLeft, StateRight: AnsiString;
 begin
   Frame := Term.BeginFrame;
-  Frame.Buffer.SetStyle(Frame.Area, TStyle.Default.WithBg(Theme.BgPrimary));
+  // Don't paint the entire frame with BgPrimary — let the terminal's
+  // own background show through for the messages area.  Only the
+  // bottom pane box gets explicit background.
 
   // Calculate bottom pane height.
   HostHeight := 0;
   if Length(ToolStatusLine) > 0 then HostHeight := 1;
   if State = asSlashMenu then HostHeight := 5;
+  // Input height: count LF in InputBuf, clamp to 1..4.
   InputHeight := 1;
+  for I := 1 to Length(InputBuf) do
+    if InputBuf[I] = #10 then Inc(InputHeight);
+  if InputHeight > 4 then InputHeight := 4;
   StatusHeight := 2;
   SepCount := 1 + Ord(HostHeight > 0);  // always input-status sep; host-input sep if host
   BottomHeight := 2 + HostHeight + SepCount + InputHeight + StatusHeight;  // 2 = top+bottom border
@@ -322,17 +331,36 @@ begin
     Inc(CurY);
   end;
 
-  // Input surface.
-  Frame.Buffer.SetStringN(BottomBox.X, CurY, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
-  Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  // Input surface (multi-line support).
+  for I := 0 to InputHeight - 1 do begin
+    Frame.Buffer.SetStringN(BottomBox.X, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+    Frame.Buffer.SetStringN(BottomBox.X + BottomBox.Width - 1, CurY + I, BorderVertical, 1, TStyle.Default.WithFg(Theme.BorderNormal));
+  end;
   Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY, InnerW, InputHeight), TStyle.Default.WithBg(Theme.BgInput));
   if Length(InputBuf) = 0 then
     Frame.Buffer.SetStringN(InnerX + 1, CurY, PLACEHOLDER, InnerW - 1, Theme.MutedText.Patch(TStyle.Default.WithBg(Theme.BgInput)))
-  else
-    Frame.Buffer.SetStringN(InnerX + 1, CurY, InputBuf, InnerW - 1, Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+  else begin
+    // Render each line of InputBuf.
+    J := 0; SliceStart := 1;
+    for I := 1 to Length(InputBuf) do begin
+      if InputBuf[I] = #10 then begin
+        Frame.Buffer.SetStringN(InnerX + 1, CurY + J, Copy(InputBuf, SliceStart, I - SliceStart), InnerW - 1,
+          Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+        Inc(J); SliceStart := I + 1;
+        if J >= InputHeight then Break;
+      end;
+    end;
+    if J < InputHeight then
+      Frame.Buffer.SetStringN(InnerX + 1, CurY + J, Copy(InputBuf, SliceStart, Length(InputBuf) - SliceStart + 1), InnerW - 1,
+        Theme.PrimaryText.Patch(TStyle.Default.WithBg(Theme.BgInput)));
+  end;
   Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
+  // Cursor position: find which line and column the cursor is on.
+  // For simplicity, cursor is always on the last line at InputCurCol
+  // relative to that line's start.  (Full cursor tracking across lines
+  // would need per-line column state — deferred.)
   Frame.CursorPos.X := InnerX + 1 + InputCurCol;
-  Frame.CursorPos.Y := CurY;
+  Frame.CursorPos.Y := CurY + InputHeight - 1;
   Inc(CurY, InputHeight);
 
   // Separator before status.
@@ -381,6 +409,11 @@ begin
   if State = asSlashMenu then begin
     case K.Code of
       kcEsc: begin State := asIdle; InputBuf := ''; InputCurCol := 0; end;
+      kcBackspace: begin
+        BackspaceInput;
+        // If input is now empty (deleted the '/'), exit menu.
+        if Length(InputBuf) = 0 then State := asIdle;
+      end;
       kcUp: if SlashMenuSel > 0 then Dec(SlashMenuSel);
       kcDown: if SlashMenuSel < 4 then Inc(SlashMenuSel);
       kcEnter: begin
@@ -389,13 +422,24 @@ begin
         State := asIdle;
         SendMessage;
       end;
+      kcChar: begin
+        // Allow typing to filter (append to input).
+        if K.Ch >= 32 then InsertInput(K.Ch);
+      end;
     else end;
     Exit;
   end;
   if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin Term.RequestQuit; Exit; end;
   case K.Code of
     kcEsc: Term.RequestQuit;
-    kcEnter: if State = asIdle then SendMessage;
+    kcEnter:
+      if State = asIdle then begin
+        // Alt+Enter = newline in input; plain Enter = send.
+        if kmAlt in K.Modifiers then
+          InsertInput(10)    // LF
+        else
+          SendMessage;
+      end;
     kcBackspace: if State = asIdle then begin
       BackspaceInput;
       if (Length(InputBuf) = 0) and (State = asSlashMenu) then State := asIdle;
