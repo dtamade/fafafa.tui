@@ -704,7 +704,7 @@ type
   end;
 ```
 
-不实现 paste / focus / kitty protocol。
+已支持 CSI u (kitty keyboard protocol)。不实现 paste / focus。
 
 ### Input parser
 
@@ -716,7 +716,7 @@ type
 - SS3 序列（ESC O ...）→ F1-F4
 - 单 ESC（no follow-up within timeout）→ `kcEsc`
 
-不解析：bracketed paste、focus events、kitty CSI u 协议。
+不解析：bracketed paste、focus events。CSI u 已支持。
 
 ## 8. cli888 实际使用频度（移植优先级参考）
 

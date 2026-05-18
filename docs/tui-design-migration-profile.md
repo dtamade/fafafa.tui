@@ -99,12 +99,12 @@ TTerminal.Capture.Active: Boolean;            // 查询状态
 ## 4. Hover/Leave 合同
 
 ```pascal
-TTerminal.PrevMousePos: TPosition;            // 上一帧鼠标位置（自动更新）
+TTerminal.PrevMousePos: TPosition;            // 上一条鼠标事件的最终坐标（PollEvent 返回前自动更新）
 ```
 
 **消费方判断逻辑**：
-- Enter = `PrevMousePos` 不在区域内 + 当前 `MousePos` 在区域内
-- Leave = `PrevMousePos` 在区域内 + 当前 `MousePos` 不在区域内
+- Enter = 上一条事件的 PrevMousePos 不在区域内 + 当前事件坐标在区域内
+- Leave = 上一条事件的 PrevMousePos 在区域内 + 当前事件坐标不在区域内
 - Stay = 两帧都在区域内
 
 **fafafa.tui 提供的 helper**：

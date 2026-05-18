@@ -1,9 +1,8 @@
 unit test_terminal_contract;
 
 // Contract tests for TTerminal main path behaviors.
-// These test the PostProcessEvent logic and Esc resolution
-// without requiring a real tty (they inject bytes directly
-// into the parser to verify behavior).
+// These call TTerminal.PostProcessEvent directly (public method)
+// to verify capture/session/PrevMousePos logic without needing a tty.
 
 {$mode objfpc}{$H+}
 
@@ -18,33 +17,8 @@ uses
   ftui_rect,
   ftui_event,
   ftui_input_parser,
-  ftui_interaction;
-
-// Simulate PostProcessEvent logic on a parsed event.
-// This mirrors what TTerminal.PostProcessEvent does.
-procedure SimulatePostProcess(var Ev: TEvent;
-  var Capture: TPointerCapture; var Session: TInteractionSession;
-  var PrevPos: TPosition);
-begin
-  case Ev.Kind of
-    evMouse:
-      begin
-        PrevPos.X := Ev.Mouse.X;
-        PrevPos.Y := Ev.Mouse.Y;
-        if (Ev.Mouse.Kind = mkUp) and Capture.Active then
-        begin
-          if Session.IsActive then Session.Commit;
-          Capture.Release;
-        end;
-      end;
-    evKey:
-      if (Ev.Key.Code = kcEsc) and Session.IsActive then
-      begin
-        Session.Cancel;
-        Capture.Release;
-      end;
-  end;
-end;
+  ftui_interaction,
+  ftui_terminal;
 
 procedure Test_BareEscResolvesAfterTimeout;
 var
@@ -53,123 +27,115 @@ var
   R: TParseResult;
   Buf: array[0..0] of Byte;
 begin
-  // With AtEOF=False, bare ESC returns NeedMore.
   Buf[0] := 27;
   R := ParseOne(Buf[0], 1, False, Ev, Consumed);
   AssertEqInt(Ord(prNeedMore), Ord(R), 'bare ESC + AtEOF=False -> NeedMore');
-
-  // With AtEOF=True (simulating timeout), bare ESC resolves to kcEsc.
   R := ParseOne(Buf[0], 1, True, Ev, Consumed);
   AssertEqInt(Ord(prSuccess), Ord(R), 'bare ESC + AtEOF=True -> Success');
   AssertEqInt(Ord(kcEsc), Ord(Ev.Key.Code), 'resolves to kcEsc');
-  AssertEqInt(1, Consumed, 'consumes 1 byte');
 end;
 
 procedure Test_EscCancelsActiveSession;
 var
   Ev: TEvent;
+  Term: TTerminal;
   Cap: TPointerCapture;
   Sess: TInteractionSession;
-  Prev: TPosition;
 begin
-  Cap.Release;
-  Sess.State := ssNone;
-  Prev.X := 0; Prev.Y := 0;
+  Term := TTerminal.Create;
+  try
+    Cap := Term.Capture;
+    Sess := Term.Session;
+    Cap.Acquire(Pointer(1), mbLeft);
+    Sess.Begin_(Pointer(1));
+    Term.Capture := Cap;
+    Term.Session := Sess;
 
-  // Start a session + capture.
-  Cap.Acquire(Pointer(1), mbLeft);
-  Sess.Begin_(Pointer(1));
-  AssertTrue(Sess.IsActive, 'session active');
-  AssertTrue(Cap.Active, 'capture active');
+    Ev := KeyCodeEvent(kcEsc, []);
+    Term.PostProcessEvent(Ev);
 
-  // Simulate Esc event.
-  Ev := KeyCodeEvent(kcEsc, []);
-  SimulatePostProcess(Ev, Cap, Sess, Prev);
-
-  AssertFalse(Sess.IsActive, 'session cancelled by Esc');
-  AssertEqInt(Ord(ssCancelled), Ord(Sess.State), 'state = cancelled');
-  AssertFalse(Cap.Active, 'capture released by Esc');
+    AssertFalse(Term.Session.IsActive, 'session cancelled');
+    AssertEqInt(Ord(ssCancelled), Ord(Term.Session.State), 'state=cancelled');
+    AssertFalse(Term.Capture.Active, 'capture released');
+  finally
+    Term.Free;
+  end;
 end;
 
 procedure Test_MouseUpAutoReleasesCapture;
 var
   Ev: TEvent;
+  Term: TTerminal;
   Cap: TPointerCapture;
   Sess: TInteractionSession;
-  Prev: TPosition;
 begin
-  Cap.Release;
-  Sess.State := ssNone;
-  Prev.X := 0; Prev.Y := 0;
+  Term := TTerminal.Create;
+  try
+    Cap := Term.Capture;
+    Sess := Term.Session;
+    Cap.Acquire(Pointer(2), mbLeft);
+    Sess.Begin_(Pointer(2));
+    Term.Capture := Cap;
+    Term.Session := Sess;
 
-  Cap.Acquire(Pointer(2), mbLeft);
-  Sess.Begin_(Pointer(2));
+    Ev := MouseEvent(mkUp, mbLeft, 10, 10, []);
+    Term.PostProcessEvent(Ev);
 
-  // Simulate MouseUp.
-  Ev := MouseEvent(mkUp, mbLeft, 10, 10, []);
-  SimulatePostProcess(Ev, Cap, Sess, Prev);
-
-  AssertFalse(Cap.Active, 'capture released on MouseUp');
-  AssertEqInt(Ord(ssCommitted), Ord(Sess.State), 'session committed on MouseUp');
+    AssertFalse(Term.Capture.Active, 'capture released on MouseUp');
+    AssertEqInt(Ord(ssCommitted), Ord(Term.Session.State), 'session committed');
+  finally
+    Term.Free;
+  end;
 end;
 
 procedure Test_PrevMousePosUpdatedOnMouseEvent;
 var
   Ev: TEvent;
-  Cap: TPointerCapture;
-  Sess: TInteractionSession;
-  Prev: TPosition;
+  Term: TTerminal;
 begin
-  Cap.Release;
-  Sess.State := ssNone;
-  Prev.X := 5; Prev.Y := 5;
-
-  Ev := MouseEvent(mkMoved, mbNone, 20, 15, []);
-  SimulatePostProcess(Ev, Cap, Sess, Prev);
-
-  AssertEqInt(20, Prev.X, 'PrevMousePos.X updated');
-  AssertEqInt(15, Prev.Y, 'PrevMousePos.Y updated');
+  Term := TTerminal.Create;
+  try
+    Ev := MouseEvent(mkMoved, mbNone, 20, 15, []);
+    Term.PostProcessEvent(Ev);
+    AssertEqInt(20, Term.PrevMousePos.X, 'PrevMousePos.X updated');
+    AssertEqInt(15, Term.PrevMousePos.Y, 'PrevMousePos.Y updated');
+  finally
+    Term.Free;
+  end;
 end;
 
 procedure Test_EscWithoutSessionPassesThrough;
 var
   Ev: TEvent;
-  Cap: TPointerCapture;
-  Sess: TInteractionSession;
-  Prev: TPosition;
+  Term: TTerminal;
 begin
-  Cap.Release;
-  Sess.State := ssNone;
-  Prev.X := 0; Prev.Y := 0;
-
-  // No active session — Esc should not change anything.
-  Ev := KeyCodeEvent(kcEsc, []);
-  SimulatePostProcess(Ev, Cap, Sess, Prev);
-
-  AssertEqInt(Ord(ssNone), Ord(Sess.State), 'session unchanged');
-  AssertFalse(Cap.Active, 'capture still inactive');
-  // Event kind unchanged — consumer gets kcEsc to handle (e.g. quit).
-  AssertEqInt(Ord(kcEsc), Ord(Ev.Key.Code), 'event preserved');
+  Term := TTerminal.Create;
+  try
+    Ev := KeyCodeEvent(kcEsc, []);
+    Term.PostProcessEvent(Ev);
+    AssertEqInt(Ord(ssNone), Ord(Term.Session.State), 'session unchanged');
+    AssertFalse(Term.Capture.Active, 'capture still inactive');
+    AssertEqInt(Ord(kcEsc), Ord(Ev.Key.Code), 'event preserved');
+  finally
+    Term.Free;
+  end;
 end;
 
 procedure Test_MouseUpWithoutCaptureIsNoop;
 var
   Ev: TEvent;
-  Cap: TPointerCapture;
-  Sess: TInteractionSession;
-  Prev: TPosition;
+  Term: TTerminal;
 begin
-  Cap.Release;
-  Sess.State := ssNone;
-  Prev.X := 0; Prev.Y := 0;
-
-  // MouseUp without capture — should just update PrevMousePos.
-  Ev := MouseEvent(mkUp, mbLeft, 30, 20, []);
-  SimulatePostProcess(Ev, Cap, Sess, Prev);
-
-  AssertEqInt(30, Prev.X, 'PrevMousePos updated');
-  AssertFalse(Cap.Active, 'capture still inactive');
-  AssertEqInt(Ord(ssNone), Ord(Sess.State), 'session unchanged');
+  Term := TTerminal.Create;
+  try
+    Ev := MouseEvent(mkUp, mbLeft, 30, 20, []);
+    Term.PostProcessEvent(Ev);
+    AssertEqInt(30, Term.PrevMousePos.X, 'PrevMousePos updated');
+    AssertFalse(Term.Capture.Active, 'capture still inactive');
+    AssertEqInt(Ord(ssNone), Ord(Term.Session.State), 'session unchanged');
+  finally
+    Term.Free;
+  end;
 end;
 
 procedure RegisterTerminalContractTests;

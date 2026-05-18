@@ -21,8 +21,9 @@ uses
 type
   THoverChange = (hcNone, hcEntered, hcLeft, hcStay);
 
-  // Pointer capture: once set, all mouse events route to the
-  // captured target until released.
+  // Pointer capture: consumer checks Capture.Active to decide if
+  // events belong to the current drag session. TTerminal auto-releases
+  // on MouseUp (commit) or Esc (cancel).
   TPointerCapture = record
     Active: Boolean;
     Target: Pointer;       // opaque; consumer casts to their type

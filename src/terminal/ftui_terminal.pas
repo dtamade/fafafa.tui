@@ -84,8 +84,8 @@ type
     procedure CheckSignals(out ResizeOut: TEvent; out HasResize: Boolean);
     procedure ResizeBuffersTo(W, H: Word);
     procedure DetectCapabilities;
-    procedure PostProcessEvent(var Ev: TEvent);
   public
+    procedure PostProcessEvent(var Ev: TEvent); // public for contract testing
     constructor Create;
     destructor Destroy; override;
 
