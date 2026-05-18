@@ -190,9 +190,9 @@ end;
 // Returns the number of rows consumed (1 for single-line, more for wrapped AI).
 function RenderMessage(Buf: TBuffer; const M: TMsg; X, Y, W: Integer): Integer;
 var
-  Indicator, Line: AnsiString;
+  Indicator: AnsiString;
   IndSty, ContentSty, BgSty: TStyle;
-  I, ContentStart: Integer;
+  I, ContentStart, SliceStart: Integer;
   Lines: array of AnsiString;
   LineCount_: Integer;
 begin
@@ -252,20 +252,27 @@ begin
   ContentStart := GraphemeWidth(Indicator);
 
   // Split content by LF for multi-line messages.
+  // Two-pass: count lines, then Copy slices (no char-by-char concat).
   LineCount_ := 1;
   for I := 1 to Length(M.Content) do
     if M.Content[I] = #10 then Inc(LineCount_);
   SetLength(Lines, LineCount_);
-  // Quick split.
   LineCount_ := 0;
-  Line := '';
+  SliceStart := 1;
   for I := 1 to Length(M.Content) do
   begin
-    if M.Content[I] = #10 then begin Lines[LineCount_] := Line; Inc(LineCount_); Line := ''; end
-    else Line := Line + M.Content[I];
+    if M.Content[I] = #10 then
+    begin
+      Lines[LineCount_] := Copy(M.Content, SliceStart, I - SliceStart);
+      Inc(LineCount_);
+      SliceStart := I + 1;
+    end;
   end;
-  Lines[LineCount_] := Line;
+  Lines[LineCount_] := Copy(M.Content, SliceStart, Length(M.Content) - SliceStart + 1);
   Inc(LineCount_);
+
+  // Recalculate ContentStart as the display-column offset for content.
+  ContentStart := GraphemeWidth(Indicator);
 
   // First line on the indicator row.
   if LineCount_ > 0 then
@@ -297,7 +304,7 @@ var
   MsgArea, InputArea, Status1Area, Status2Area: TRect;
   InputBlock: TBlock;
   InputInner: TRect;
-  I, Y, RowsUsed, StartI, TotalRows: Integer;
+  I, Y, J, RowsUsed, TotalRows: Integer;
   StatusLeft, StatusRight, HintLeft, StateRight: AnsiString;
   Sp: AnsiString;
   PopupArea: TRect;
@@ -334,7 +341,6 @@ begin
   end;
 
   // Render messages bottom-up (newest at bottom of area).
-  StartI := MsgCount - 1;
   Y := MsgArea.Y + MsgArea.Height;
   // Walk backwards to find which messages fit.
   I := MsgCount - 1 + ScrollOffset;
@@ -343,8 +349,8 @@ begin
   begin
     RowsUsed := 1;
     if Msgs[I].Role = mrAI then Inc(RowsUsed, 2);
-    for StartI := 1 to Length(Msgs[I].Content) do
-      if Msgs[I].Content[StartI] = #10 then Inc(RowsUsed);
+    for J := 1 to Length(Msgs[I].Content) do
+      if Msgs[I].Content[J] = #10 then Inc(RowsUsed);
     Dec(Y, RowsUsed);
     Dec(I);
   end;
