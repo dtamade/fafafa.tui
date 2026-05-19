@@ -67,14 +67,30 @@ end;
 
 function RunAllTests: Integer;
 var
-  I, Failed: Integer;
-  Started: AnsiString;
+  I, Failed, Ran, Skipped: Integer;
+  Started, Filter: AnsiString;
 begin
   Failed := 0;
-  WriteLn(Format('running %d tests', [Length(GTests)]));
+  Ran := 0;
+  Skipped := 0;
+  Filter := '';
+  if ParamCount >= 1 then
+    Filter := ParamStr(1);
+
+  if Filter = '' then
+    WriteLn(Format('running %d tests', [Length(GTests)]))
+  else
+    WriteLn(Format('running tests matching "%s"', [Filter]));
+
   for I := 0 to High(GTests) do
   begin
     Started := GTests[I].Name;
+    if (Filter <> '') and (Pos(Filter, Started) = 0) then
+    begin
+      Inc(Skipped);
+      Continue;
+    end;
+    Inc(Ran);
     try
       GTests[I].Proc();
       WriteLn('  ok      ', Started);
@@ -95,9 +111,11 @@ begin
   end;
   WriteLn;
   if Failed = 0 then
-    WriteLn(Format('all %d tests passed', [Length(GTests)]))
+    WriteLn(Format('all %d tests passed', [Ran]))
   else
-    WriteLn(Format('%d / %d tests failed', [Failed, Length(GTests)]));
+    WriteLn(Format('%d / %d tests failed', [Failed, Ran]));
+  if Skipped > 0 then
+    WriteLn(Format('(%d skipped by filter)', [Skipped]));
   Result := Failed;
 end;
 

@@ -19,7 +19,7 @@
 | `ftui_modifier` | TModifierBit + TModifier (set of 9 bits) |
 | `ftui_style` | TStyle + WithFg/WithBg/WithModifier/Patch |
 | `ftui_cell` | TCell + CellEmpty + CellSetSymbol/ApplyStyle/Equals |
-| `ftui_buffer` | TBuffer + SetString/SetStyle/Diff/Resize/Reset |
+| `ftui_buffer` | TBuffer + SetString/SetStyle/Diff/Resize/Reset/ContentPtr |
 | `ftui_grapheme` | GraphemeAdvance / GraphemeWidth / CodepointWidth |
 | `ftui_text` | TSpan / TLine / TText / TAlignment |
 | `ftui_layout` | TConstraint (Length/Min/Percentage) + TLayout.Split |
