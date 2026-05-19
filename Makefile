@@ -23,7 +23,7 @@ FPC_UNIT_FLAGS := $(foreach d,$(UNIT_DIRS),-Fu$(d))
 FPC_LINK_FLAGS := -FE$(BIN_DIR)
 FPC_FLAGS := $(FPC_BASE_FLAGS) $(FPC_UNIT_FLAGS) $(FPC_LINK_FLAGS)
 
-.PHONY: all test examples benchmarks acceptance clean help
+.PHONY: all test examples benchmarks bench acceptance ci clean help
 
 all: test
 
@@ -32,6 +32,9 @@ help:
 	@echo "  test         build & run tests/test_runner.lpr"
 	@echo "  examples     build everything in examples/"
 	@echo "  benchmarks   build everything in benchmarks/"
+	@echo "  bench        build + run all benchmarks with summary table"
+	@echo "  acceptance   PTY-level demo verification (requires tmux)"
+	@echo "  ci           full gate: test + examples + benchmarks + acceptance"
 	@echo "  clean        wipe build/ and stray .ppu/.o"
 
 test:
@@ -75,3 +78,10 @@ clean:
 acceptance: examples
 	@echo "Running PTY acceptance tests (requires tmux)..."
 	@bash scripts/acceptance_test.sh
+
+ci: test examples benchmarks acceptance
+	@echo ""
+	@echo "=== CI gate passed ==="
+
+bench: benchmarks
+	@bash scripts/bench_all.sh
