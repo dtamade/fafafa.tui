@@ -11,6 +11,9 @@
 | bench_input | 100K ESC 序列解析 | 50 ns/event | < 1μs | PASS |
 | bench_render | 80×24, 1000 帧, 20 items | 140 μs/frame | < 1ms | PASS |
 | bench_mouse_move | 1000 连续 moved 事件 | 14 μs/event | < 500μs | PASS |
+| bench_cjk (ASCII) | 80×24, 1000 帧, 15 items | 113 μs/frame | — | baseline |
+| bench_cjk (CJK) | 80×24, 1000 帧, 纯中文 | 107 μs/frame | — | 0.95x |
+| bench_cjk (Mixed) | 80×24, 1000 帧, 中英混合 | 113 μs/frame | — | 1.0x |
 
 ## bench_diff 分阶段分析
 
