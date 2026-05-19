@@ -381,6 +381,7 @@ end;
 procedure TTerminal.PostProcessEvent(var Ev: TEvent);
 begin
   case Ev.Kind of
+    evNone, evResize: ;
     evMouse:
       begin
         // Stage current coords into FLastMousePos.  The actual promotion

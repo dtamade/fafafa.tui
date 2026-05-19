@@ -1,7 +1,8 @@
 unit test_terminal_contract;
 
 // Contract tests for TTerminal main path behaviors.
-// These call TTerminal.PostProcessEvent directly (public method)
+// These call TTerminal.PostProcessEvent and PromoteMousePos (test seams,
+// not part of consumer contract) to verify main-path behaviors without a tty.
 // to verify capture/session/PrevMousePos logic without needing a tty.
 
 {$mode objfpc}{$H+}
@@ -32,6 +33,7 @@ begin
   AssertEqInt(Ord(prNeedMore), Ord(R), 'bare ESC + AtEOF=False -> NeedMore');
   R := ParseOne(Buf[0], 1, True, Ev, Consumed);
   AssertEqInt(Ord(prSuccess), Ord(R), 'bare ESC + AtEOF=True -> Success');
+  AssertEqInt(27, Buf[0], 'buf preserved');
   AssertEqInt(Ord(kcEsc), Ord(Ev.Key.Code), 'resolves to kcEsc');
 end;
 
