@@ -86,7 +86,8 @@ type
     procedure ResizeBuffersTo(W, H: Word);
     procedure DetectCapabilities;
   public
-    procedure PostProcessEvent(var Ev: TEvent); // public for contract testing
+    procedure PostProcessEvent(var Ev: TEvent);
+    procedure PromoteMousePos;  // for testing: simulates PollEvent start
     constructor Create;
     destructor Destroy; override;
 
@@ -372,20 +373,22 @@ end;
 
 // Post-process a successfully parsed event: update PrevMousePos,
 // handle Esc-cancel-session, auto-release capture on MouseUp.
+procedure TTerminal.PromoteMousePos;
+begin
+  FPrevMousePos := FLastMousePos;
+end;
+
 procedure TTerminal.PostProcessEvent(var Ev: TEvent);
 begin
   case Ev.Kind of
     evMouse:
       begin
-        // NOTE: FPrevMousePos is updated AFTER consumer processes the event.
-        // We do it here because this runs before Exit, but the consumer
-        // reads PrevMousePos BEFORE calling PollEvent again.  The sequence:
-        //   1. Consumer calls PollEvent → gets event with current coords
-        //   2. PostProcessEvent updates FPrevMousePos to current coords
-        //   3. Consumer reads Term.PrevMousePos → gets CURRENT coords
-        //   4. Next PollEvent → consumer compares new event vs PrevMousePos
-        // This means PrevMousePos = "coords of the LAST event", which is
-        // exactly what DetectHoverChange needs (compare prev vs curr).
+        // Stage current coords into FLastMousePos.  The actual promotion
+        // to FPrevMousePos happens at the START of the next PollEvent call.
+        // This ensures that when the consumer reads Term.PrevMousePos after
+        // PollEvent returns, it sees the PREVIOUS event's coords — not the
+        // current one.  Consumer uses PrevMousePos + Event.Mouse.X/Y for
+        // DetectHoverChange (enter/leave detection).
         FLastMousePos.X := Ev.Mouse.X;
         FLastMousePos.Y := Ev.Mouse.Y;
         // Auto-release capture on MouseUp.

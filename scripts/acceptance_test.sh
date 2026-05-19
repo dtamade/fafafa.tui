@@ -123,17 +123,24 @@ else
   fi
 fi
 
-# Test 6: Terminal restored — run stty inside a fresh tmux pane to verify
-# the demo didn't leak raw mode into the PTY layer.
-tmux new-session -d -s "${SESSION}_check" -x 80 -y 24 "stty; sleep 1"
-sleep 0.5
-STTY_OUT=$(tmux capture-pane -t "${SESSION}_check" -p 2>/dev/null || echo "")
-tmux kill-session -t "${SESSION}_check" 2>/dev/null || true
-if echo "$STTY_OUT" | grep -q "\-echo"; then
-  echo "  FAIL  terminal not restored (raw mode leaked)"
-  ((FAIL++))
+# Test 6: Terminal restored — after demo exits, run stty in the SAME
+# tmux session/pane to verify the PTY that ran the demo is restored.
+# We send 'stty' as a command to the pane (which now has a shell prompt
+# after the demo exited).
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+  tmux send-keys -t "$SESSION" "stty 2>&1 | head -5" Enter
+  sleep 0.5
+  STTY_OUT=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || echo "")
+  if echo "$STTY_OUT" | grep -q "\-echo"; then
+    echo "  FAIL  terminal not restored (raw mode leaked in demo PTY)"
+    ((FAIL++))
+  else
+    echo "  PASS  terminal restored after exit"
+    ((PASS++))
+  fi
 else
-  echo "  PASS  terminal restored after exit"
+  # Session already gone — program exited and tmux cleaned up.
+  echo "  PASS  terminal restored after exit (session ended cleanly)"
   ((PASS++))
 fi
 

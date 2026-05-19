@@ -23,7 +23,7 @@ FPC_UNIT_FLAGS := $(foreach d,$(UNIT_DIRS),-Fu$(d))
 FPC_LINK_FLAGS := -FE$(BIN_DIR)
 FPC_FLAGS := $(FPC_BASE_FLAGS) $(FPC_UNIT_FLAGS) $(FPC_LINK_FLAGS)
 
-.PHONY: all test examples benchmarks clean help
+.PHONY: all test examples benchmarks acceptance clean help
 
 all: test
 
@@ -71,3 +71,7 @@ clean:
 	find $(BENCHMARKS_DIR) -name '*.ppu' -delete 2>/dev/null || true
 	find $(TUI_ROOT) -name 'link*.res' -delete 2>/dev/null || true
 	find $(TUI_ROOT) -name 'ppas.sh' -delete 2>/dev/null || true
+
+acceptance: examples
+	@echo "Running PTY acceptance tests (requires tmux)..."
+	@bash scripts/acceptance_test.sh

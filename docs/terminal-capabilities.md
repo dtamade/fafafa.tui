@@ -61,7 +61,7 @@ fafafa.tui 依赖的终端能力及各终端支持情况。
 
 ```pascal
 // TTerminal 提供能力查询：
-TTerminal.HasMouseTracking: Boolean;    // 1003h 是否生效
+TTerminal.HasMouseTracking: Boolean;    // optimistic: 已请求开启 1003h（不做主动探测）
 TTerminal.HasTruecolor: Boolean;        // 检测 $COLORTERM
 TTerminal.HasKittyKeyboard: Boolean;    // $TERM_PROGRAM 乐观推断（kitty/wezterm/ghostty）
 ```
@@ -76,4 +76,4 @@ TTerminal.HasKittyKeyboard: Boolean;    // $TERM_PROGRAM 乐观推断（kitty/we
 1. **$COLORTERM**：`truecolor` 或 `24bit` → HasTruecolor
 2. **$TERM_PROGRAM**：`WezTerm` / `kitty` / `ghostty` → HasKittyKeyboard
 3. **$TMUX**：非空 → 提示 mouse 配置
-4. **CSI ?1003h 后检测**：发送后如果收到 motion 事件 → HasMouseTracking（被动检测）
+4. **CSI ?1003h**：发送后直接设为 True（optimistic flag，不做被动检测）

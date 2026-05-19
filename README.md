@@ -58,44 +58,46 @@ Pascal 项目的 **通用 TUI 运行时**。从 CLI 聊天到图形编辑器的�
 
 ```pascal
 program myapp;
-
 {$mode objfpc}{$H+}
-
 uses
-  SysUtils,
-  ftui_rect,
-  ftui_color, ftui_modifier, ftui_style,
-  ftui_buffer, ftui_text,
-  ftui_layout,
-  ftui_widgets,
-  ftui_terminal;
-
+  ftui_rect, ftui_style, ftui_buffer,
+  ftui_borders, ftui_block, ftui_event, ftui_terminal;
 var
   Term: TTerminal;
   Frame: TFrame;
+  Ev: TEvent;
 begin
-  Term := TTerminal.CreateAnsi;
+  Term := TTerminal.Create;
   try
-    Term.EnterRawMode;
+    if not Term.EnterTui then begin WriteLn('not a tty'); Halt(1); end;
     while not Term.ShouldQuit do
     begin
       Frame := Term.BeginFrame;
-      try
-        TBlock.Default
-          .Borders([bsAll])
-          .Title('hello')
-          .Render(Frame.Area, Frame.Buffer);
-      finally
-        Term.EndFrame(Frame);
-      end;
-
-      Term.PollEvents;
+      TBlock.Default
+        .WithBorders(BordersAll)
+        .WithTitle('hello')
+        .Render(Frame.Area, Frame.Buffer);
+      Term.EndFrame(Frame);
+      Ev := Term.PollEvent(-1);
+      if (Ev.Kind = evKey) and (Ev.Key.Code = kcEsc) then
+        Term.RequestQuit;
     end;
   finally
-    Term.LeaveRawMode;
+    Term.LeaveTui;
     Term.Free;
   end;
 end.
+```
+
+## tui-design 迁移基线
+
+当前推荐锁定版本：**`v0.8.0-rc`**
+
+验收流程：
+```bash
+make test                          # 217 unit tests
+make examples                      # 11 demos (含 canvas_overlay_demo)
+bash scripts/acceptance_test.sh    # 9 PTY-level tests (需要 tmux)
 ```
 
 ## 仓内构建

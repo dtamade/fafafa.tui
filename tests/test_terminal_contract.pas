@@ -88,28 +88,25 @@ begin
   end;
 end;
 
-procedure Test_PrevMousePosUpdatedOnNextPoll;
+procedure Test_PrevMousePosPromotedOnNextPoll;
 var
   Ev: TEvent;
   Term: TTerminal;
 begin
   Term := TTerminal.Create;
   try
-    // First event at (20, 15).
+    AssertEqInt(0, Term.PrevMousePos.X, 'initial X=0');
     Ev := MouseEvent(mkMoved, mbNone, 20, 15, []);
     Term.PostProcessEvent(Ev);
-    // PrevMousePos is NOT yet updated (it updates at next PollEvent start).
-    // But FLastMousePos is staged internally.
-    // Simulate next PollEvent start by calling PostProcessEvent again:
+    AssertEqInt(0, Term.PrevMousePos.X, 'after first event: still 0');
+    Term.PromoteMousePos;
+    AssertEqInt(20, Term.PrevMousePos.X, 'after promote: X=20');
+    AssertEqInt(15, Term.PrevMousePos.Y, 'after promote: Y=15');
     Ev := MouseEvent(mkMoved, mbNone, 30, 25, []);
-    // Before this PostProcessEvent, PollEvent would promote FLastMousePos.
-    // Since we can't call PollEvent without a tty, we verify the staging:
-    // After first PostProcess, PrevMousePos should still be (0,0) (initial).
-    // After second PostProcess, PrevMousePos should be (20,15) (first event).
-    // But we can't test the promotion without PollEvent...
-    // Instead, verify the contract: PrevMousePos at construction is (0,0).
-    AssertEqInt(0, Term.PrevMousePos.X, 'PrevMousePos.X starts at 0');
-    AssertEqInt(0, Term.PrevMousePos.Y, 'PrevMousePos.Y starts at 0');
+    Term.PostProcessEvent(Ev);
+    AssertEqInt(20, Term.PrevMousePos.X, 'after second event: still 20');
+    Term.PromoteMousePos;
+    AssertEqInt(30, Term.PrevMousePos.X, 'after second promote: X=30');
   finally
     Term.Free;
   end;
@@ -155,7 +152,7 @@ begin
   RegisterTest('contract / bare Esc resolves after timeout',    @Test_BareEscResolvesAfterTimeout);
   RegisterTest('contract / Esc cancels active session',         @Test_EscCancelsActiveSession);
   RegisterTest('contract / MouseUp auto-releases capture',      @Test_MouseUpAutoReleasesCapture);
-  RegisterTest('contract / PrevMousePos deferred to next PollEvent',@Test_PrevMousePosUpdatedOnNextPoll);
+  RegisterTest('contract / PrevMousePos promoted on next PollEvent',@Test_PrevMousePosPromotedOnNextPoll);
   RegisterTest('contract / Esc without session passes through', @Test_EscWithoutSessionPassesThrough);
   RegisterTest('contract / MouseUp without capture is noop',    @Test_MouseUpWithoutCaptureIsNoop);
 end;
