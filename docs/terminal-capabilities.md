@@ -67,7 +67,7 @@ TTerminal.HasKittyKeyboard: Boolean;    // $TERM_PROGRAM 乐观推断（kitty/we
 ```
 
 消费方根据这些 flag 决定：
-- `HasMouseTracking = False` → 不显示 hover 反馈，不启用 drag
+- `HasMouseTracking = False` → 终端可能不支持 motion tracking（但极少见于现代终端）
 - `HasTruecolor = False` → 用 indexed color 替代 RGB
 - `HasKittyKeyboard = False` → Shift+Enter 降级为 Alt+Enter
 

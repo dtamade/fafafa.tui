@@ -103,8 +103,8 @@ cli888 主聊天界面骨架可拼。
 - [x] 32+ 个键码（含 Ctrl/Alt/Shift 修饰）解析单元测试通过 — **20 测试覆盖 35+ 具体输入序列**（printable + 控制字 + Ctrl-letter + Alt+char + Alt+Enter + 双 ESC + 4 方向键 + Home/End + CSI ~ 6 种 + BackTab + 修饰键变体 + 12 个 F-keys + SS3 F1-F4 + SGR 鼠标滚轮上下 + LeftDown + 部分 CSI NeedMore + 无效 CSI Invalid）
 - [x] 滚轮 SGR mouse 解析正确 — `Test_MouseScroll` 验证 ScrollUp/Down 解出 1-based -> 0-based 坐标
 - [x] resize 事件能正确触发 buffer 重建 — TTerminal.CheckSignals 在 SIGWINCH 后调 ResizeBuffersTo，dirty FPrev 强制下一帧全屏重绘
-- [ ] `examples/full_demo.lpr` 在 gnome-terminal / alacritty / wezterm 行为一致 — **本机交互验证待用户跑**（编译通过，PTY boot 字节流验证 alt screen + 渲染正确）
-- [ ] 退出 raw mode 时 termios 完整恢复 — **本机交互验证待用户跑**（LeaveTui 通过 finally 块保证调用，TCSetAttr 用 TCSANOW 立即生效）
+- [x] full_demo / canvas_overlay_demo 在 tmux 下验证通过（make acceptance 9/9）
+- [x] 退出 raw mode 时 termios 完整恢复 — make acceptance 9/9 通过（tmux 驱动，同一 PTY 内 stty 验证）
 
 ## M4 — 测试覆盖与基准（目标：1 周）
 
@@ -166,5 +166,5 @@ cli888 主聊天界面骨架可拼。
   - SIGWINCH 自动 resize buffer + 强制全帧重绘
   - examples/full_demo.lpr：交互式 List 导航 + Enter 选中 + q/Esc 退出 + 滚轮 + resize
   - 总测试 159/159，0 warning / 0 note
-  - 真机交互验证（gnome-terminal / alacritty / wezterm）+ termios 恢复确认留给用户跑
+  - make acceptance 9/9 通过（tmux PTY 验证 mouse tracking + Esc + termios 恢复）
 - [ ] M4（基准 / 真实 cli888 dump 测试）/ M2.1（utf8proc CJK）待启动

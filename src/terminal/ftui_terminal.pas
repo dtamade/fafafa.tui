@@ -87,7 +87,7 @@ type
     procedure DetectCapabilities;
   public
     procedure PostProcessEvent(var Ev: TEvent);
-    procedure PromoteMousePos;  // for testing: simulates PollEvent start
+    procedure PromoteMousePos;  // test seam only — not part of consumer contract
     constructor Create;
     destructor Destroy; override;
 

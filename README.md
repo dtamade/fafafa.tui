@@ -97,7 +97,7 @@ end.
 ```bash
 make test                          # 217 unit tests
 make examples                      # 11 demos (含 canvas_overlay_demo)
-bash scripts/acceptance_test.sh    # 9 PTY-level tests (需要 tmux)
+make acceptance                     # 9 PTY-level tests (需要 tmux)
 ```
 
 ## 仓内构建

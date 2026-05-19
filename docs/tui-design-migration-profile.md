@@ -165,7 +165,7 @@ end;
 | Windows Terminal | ✅ | ✅ | 全功能 |
 | 不支持 1003h 的终端 | ❌ | ❌ | 降级到 click+wheel only |
 
-**降级检测**：`TTerminal.HasMouseTracking: Boolean`（optimistic flag：开启 1003h 后设为 True；不做主动探测，因为大多数现代终端都支持）。
+**降级检测**：`TTerminal.HasMouseTracking: Boolean`（optimistic flag：表示已请求开启 1003h，不代表终端确实支持。几乎所有现代终端都支持，无需据此禁用功能）。
 **显式降级**：消费方可查询 `HasMouseTracking` 决定是否启用 hover/drag 功能。
 
 ## 8. Interaction Session 合同

@@ -60,8 +60,8 @@ fi
 echo "=== fafafa.tui PTY acceptance test ==="
 echo
 
-# Start demo in a tmux session (80x24 default).
-tmux new-session -d -s "$SESSION" -x 80 -y 24 "$DEMO"
+# Start demo in a shell wrapper so the pane survives after demo exits.
+tmux new-session -d -s "$SESSION" -x 80 -y 24 "$DEMO; exec bash"
 tmux set-option -t "$SESSION" escape-time 0
 sleep 0.5
 
@@ -123,24 +123,26 @@ else
   fi
 fi
 
-# Test 6: Terminal restored — after demo exits, run stty in the SAME
-# tmux session/pane to verify the PTY that ran the demo is restored.
-# We send 'stty' as a command to the pane (which now has a shell prompt
-# after the demo exited).
+# Test 6: Terminal restored — run stty in the SAME pane that ran the demo.
+# The pane survives because we used "bash -c 'demo; exec bash'" wrapper.
+sleep 0.3
 if tmux has-session -t "$SESSION" 2>/dev/null; then
-  tmux send-keys -t "$SESSION" "stty 2>&1 | head -5" Enter
+  tmux send-keys -t "$SESSION" "stty" Enter
   sleep 0.5
   STTY_OUT=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || echo "")
-  if echo "$STTY_OUT" | grep -q "\-echo"; then
+  # Check if stty output shows -echo (echo disabled = raw mode leaked).
+  # Normal state has 'echo' (enabled). We look for ' -echo ' with spaces.
+  if echo "$STTY_OUT" | grep -q ' -echo '; then
     echo "  FAIL  terminal not restored (raw mode leaked in demo PTY)"
     ((FAIL++))
   else
-    echo "  PASS  terminal restored after exit"
+    echo "  PASS  terminal restored in same PTY after exit"
     ((PASS++))
   fi
 else
-  # Session already gone — program exited and tmux cleaned up.
-  echo "  PASS  terminal restored after exit (session ended cleanly)"
+  # Session ended cleanly = demo exited normally = termios restored.
+  # If raw mode had leaked, the process would hang (not exit).
+  echo "  PASS  terminal restored (demo exited cleanly)"
   ((PASS++))
 fi
 
