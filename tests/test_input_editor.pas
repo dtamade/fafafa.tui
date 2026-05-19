@@ -17,7 +17,7 @@ uses
   ftui_input_editor;
 
 procedure Test_EmptyOnCreate;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -28,7 +28,7 @@ begin
 end;
 
 procedure Test_InsertAscii;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -40,7 +40,7 @@ begin
 end;
 
 procedure Test_InsertCjk;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -51,7 +51,7 @@ begin
 end;
 
 procedure Test_InsertNewlineAndLineCount;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -64,7 +64,7 @@ begin
 end;
 
 procedure Test_MaxLinesLimit;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.CreateWithMaxLines(2);
   try
@@ -79,7 +79,7 @@ begin
 end;
 
 procedure Test_BackspaceAscii;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -94,7 +94,7 @@ begin
 end;
 
 procedure Test_BackspaceCjk;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -108,7 +108,7 @@ begin
 end;
 
 procedure Test_BackspaceAcrossLine;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -123,7 +123,7 @@ begin
 end;
 
 procedure Test_DeleteForward;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -137,7 +137,7 @@ begin
 end;
 
 procedure Test_MoveLeftRight;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
     P: TPosition;
 begin
   E := TInputEditor.Create;
@@ -158,7 +158,7 @@ begin
 end;
 
 procedure Test_MoveUpDown;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
     P: TPosition;
 begin
   E := TInputEditor.Create;
@@ -183,7 +183,7 @@ begin
 end;
 
 procedure Test_HomeEnd;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
     P: TPosition;
 begin
   E := TInputEditor.Create;
@@ -201,7 +201,7 @@ begin
 end;
 
 procedure Test_Clear;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try
@@ -234,7 +234,7 @@ begin
 end;
 
 procedure Test_HandleKeyShiftEnter;
-var E: TInputEditor; Buf2: TBuffer;
+var E: TInputEditor;
 begin
   E := TInputEditor.Create;
   try

@@ -12,6 +12,7 @@ unit ftui_ansi;
 // (`\x1b[38;5;N`) and truecolor (`\x1b[38;2;R;G;B`) SGR.
 
 {$mode objfpc}{$H+}{$inline on}
+{$NOTES OFF}
 
 interface
 
