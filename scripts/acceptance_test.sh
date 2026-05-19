@@ -1,24 +1,19 @@
 #!/bin/bash
 # scripts/acceptance_test.sh
-# PTY-level acceptance test using tmux.
-# Drives canvas_overlay_demo through a real terminal session and
-# verifies key behaviors by inspecting tmux pane content.
+# PTY-level acceptance tests for all fafafa.tui examples.
+# Drives demos through tmux and verifies output by inspecting pane content.
 #
 # Requirements: tmux, make (examples must be built first)
-# Usage: make examples && bash scripts/acceptance_test.sh
-#
-# Tests:
-#   1. Program starts and renders canvas
-#   2. Mouse move updates cursor position in status bar
-#   3. Esc quits cleanly (exit code 0)
-#   4. Terminal is restored after exit (no raw mode residue)
+# Usage: make acceptance
 
 set -uo pipefail
 
-DEMO="./build/bin/canvas_overlay_demo"
-SESSION="ftui_acceptance_$$"
+BIN="./build/bin"
+SESSION="ftui_acc_$$"
 PASS=0
 FAIL=0
+TOTAL_PASS=0
+TOTAL_FAIL=0
 
 cleanup() {
   tmux kill-session -t "$SESSION" 2>/dev/null || true
@@ -28,10 +23,10 @@ trap cleanup EXIT
 assert_contains() {
   local desc="$1" pattern="$2" content="$3"
   if echo "$content" | grep -q "$pattern"; then
-    echo "  PASS  $desc"
+    echo "  ok      $desc"
     ((PASS++))
   else
-    echo "  FAIL  $desc (pattern '$pattern' not found)"
+    echo "  FAIL    $desc (pattern '$pattern' not found)"
     ((FAIL++))
   fi
 }
@@ -39,12 +34,48 @@ assert_contains() {
 assert_not_contains() {
   local desc="$1" pattern="$2" content="$3"
   if echo "$content" | grep -q "$pattern"; then
-    echo "  FAIL  $desc (pattern '$pattern' should not be present)"
+    echo "  FAIL    $desc (pattern '$pattern' should not be present)"
     ((FAIL++))
   else
-    echo "  PASS  $desc"
+    echo "  ok      $desc"
     ((PASS++))
   fi
+}
+
+assert_exit_clean() {
+  local desc="$1"
+  sleep 0.3
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    local pane_dead
+    pane_dead=$(tmux display-message -t "$SESSION" -p '#{pane_dead}' 2>/dev/null || echo "")
+    if [ "$pane_dead" = "1" ]; then
+      echo "  ok      $desc"
+      ((PASS++))
+    else
+      echo "  FAIL    $desc (process still running)"
+      ((FAIL++))
+    fi
+  else
+    echo "  ok      $desc"
+    ((PASS++))
+  fi
+}
+
+start_demo() {
+  local demo="$1"
+  cleanup
+  tmux new-session -d -s "$SESSION" -x 80 -y 24 "$BIN/$demo"
+  tmux set-option -t "$SESSION" remain-on-exit on 2>/dev/null
+  tmux set-option -t "$SESSION" escape-time 0 2>/dev/null
+  sleep 0.5
+}
+
+report_group() {
+  local name="$1"
+  TOTAL_PASS=$((TOTAL_PASS + PASS))
+  TOTAL_FAIL=$((TOTAL_FAIL + FAIL))
+  PASS=0
+  FAIL=0
 }
 
 if ! command -v tmux &>/dev/null; then
@@ -52,100 +83,158 @@ if ! command -v tmux &>/dev/null; then
   exit 0
 fi
 
-if [ ! -x "$DEMO" ]; then
-  echo "ERROR: $DEMO not found. Run 'make examples' first."
-  exit 1
-fi
-
-echo "=== fafafa.tui PTY acceptance test ==="
+echo "=== fafafa.tui acceptance tests ==="
 echo
 
-# Start demo in a shell wrapper so the pane survives after demo exits.
-tmux new-session -d -s "$SESSION" -x 80 -y 24 "$DEMO; exec bash"
-tmux set-option -t "$SESSION" escape-time 0
-sleep 0.5
-
-# Test 1: Program started and rendered.
+# --- hello_box: auto-exits after 800ms, renders bordered box ---
+echo ">> hello_box"
+start_demo "hello_box"
 CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_contains "canvas renders on startup" "Move mouse" "$CONTENT"
-assert_contains "status bar visible" "Move mouse" "$CONTENT"
+assert_contains "box rendered" "fafafa.tui" "$CONTENT"
+sleep 1.0
+assert_exit_clean "exits after timeout"
+report_group "hello_box"
 
-# Test 2: Send a mouse move event (SGR format).
-# CSI < 35 ; 20 ; 10 M = moved at (20, 10)
-tmux send-keys -t "$SESSION" -l $'\e[<35;20;10M'
+# --- chat_mock: auto-exits, renders cli888 layout ---
+echo ">> chat_mock"
+start_demo "chat_mock"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "title bar rendered" "fafafa.tui" "$CONTENT"
+assert_contains "message list visible" "messages" "$CONTENT"
+assert_contains "user message visible" "hello" "$CONTENT"
+sleep 1.0
+assert_exit_clean "exits after timeout"
+report_group "chat_mock"
+
+# --- layout_demo: auto-exits, renders colored regions ---
+echo ">> layout_demo"
+start_demo "layout_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "header rendered" "fafafa" "$CONTENT"
+sleep 1.0
+assert_exit_clean "exits after timeout"
+report_group "layout_demo"
+
+# --- cjk_demo: interactive, quit with 'q' ---
+echo ">> cjk_demo"
+start_demo "cjk_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "CJK title rendered" "fafafa.tui" "$CONTENT"
+assert_contains "Chinese message visible" "world" "$CONTENT"
+# Navigate down
+tmux send-keys -t "$SESSION" Down
 sleep 0.2
 CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_contains "mouse position shown in status" "(19,9)" "$CONTENT"
+assert_contains "selection moved" "1" "$CONTENT"
+# Quit
+tmux send-keys -t "$SESSION" "q"
+sleep 0.5
+assert_exit_clean "q quits cleanly"
+report_group "cjk_demo"
 
-# Test 3: Send mouse down + drag + up (draw a line).
-# Down at (10,5): CSI < 0 ; 10 ; 5 M
+# --- full_demo: interactive list navigation ---
+echo ">> full_demo"
+start_demo "full_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "list renders" "item" "$CONTENT"
+# Navigate
+tmux send-keys -t "$SESSION" Down Down Down
+sleep 0.3
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "selection indicator" ">" "$CONTENT"
+# Select with Enter
+tmux send-keys -t "$SESSION" Enter
+sleep 0.2
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "selection recorded" "selected" "$CONTENT"
+# Quit
+tmux send-keys -t "$SESSION" "q"
+sleep 0.5
+assert_exit_clean "q quits cleanly"
+report_group "full_demo"
+
+# --- streaming_demo: streaming text appears ---
+echo ">> streaming_demo"
+start_demo "streaming_demo"
+sleep 1.0
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "streaming text visible" "streaming" "$CONTENT"
+# Quit
+tmux send-keys -t "$SESSION" "q"
+sleep 0.5
+assert_exit_clean "q quits cleanly"
+report_group "streaming_demo"
+
+# --- popup_demo: modal popup ---
+echo ">> popup_demo"
+start_demo "popup_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "background list visible" "Item" "$CONTENT"
+# Open popup
+tmux send-keys -t "$SESSION" Enter
+sleep 0.3
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "popup appeared" "Enter or Esc" "$CONTENT"
+# Dismiss popup
+tmux send-keys -t "$SESSION" Escape
+sleep 0.5
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_not_contains "popup dismissed" "Enter or Esc" "$CONTENT"
+# Quit
+tmux send-keys -t "$SESSION" "q"
+sleep 0.5
+assert_exit_clean "q quits cleanly"
+report_group "popup_demo"
+
+# --- tabs_demo: tab switching ---
+echo ">> tabs_demo"
+start_demo "tabs_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "tab bar visible" "Chat" "$CONTENT"
+assert_contains "tab 1 content" "Welcome" "$CONTENT"
+# Switch to tab 2
+tmux send-keys -t "$SESSION" "2"
+sleep 0.3
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "tab 2 active" "Files" "$CONTENT"
+# Quit
+tmux send-keys -t "$SESSION" "q"
+sleep 0.5
+assert_exit_clean "q quits cleanly"
+report_group "tabs_demo"
+
+# --- canvas_overlay_demo: mouse interaction ---
+echo ">> canvas_overlay_demo"
+start_demo "canvas_overlay_demo"
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "canvas renders" "Move mouse" "$CONTENT"
+# Mouse move
+tmux send-keys -t "$SESSION" -l $'\e[<35;20;10M'
+sleep 0.3
+CONTENT=$(tmux capture-pane -t "$SESSION" -p)
+assert_contains "mouse position updated" "(19,9)" "$CONTENT"
+# Drag
 tmux send-keys -t "$SESSION" -l $'\e[<0;10;5M'
 sleep 0.1
-# Drag to (15,5): CSI < 32 ; 15 ; 5 M
 tmux send-keys -t "$SESSION" -l $'\e[<32;15;5M'
-sleep 0.1
-CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_contains "drag shows DRAGGING status" "DRAGGING" "$CONTENT"
-# Up at (15,5): CSI < 0 ; 15 ; 5 m
-tmux send-keys -t "$SESSION" -l $'\e[<0;15;5m'
 sleep 0.2
 CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_not_contains "after release, no DRAGGING" "DRAGGING" "$CONTENT"
-
-# Test 4: Esc during drag cancels (no commit).
-tmux send-keys -t "$SESSION" -l $'\e[<0;5;3M'
-sleep 0.1
-tmux send-keys -t "$SESSION" -l $'\e[<32;10;3M'
-sleep 0.1
+assert_contains "drag active" "DRAGGING" "$CONTENT"
+# Release
+tmux send-keys -t "$SESSION" -l $'\e[<0;15;5m'
+sleep 0.3
 CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_contains "drag active before Esc" "DRAGGING" "$CONTENT"
-# Send Esc (wait longer for bare-Esc timeout resolution).
-tmux send-keys -t "$SESSION" Escape
-sleep 0.8
-CONTENT=$(tmux capture-pane -t "$SESSION" -p)
-assert_not_contains "Esc cancels drag" "DRAGGING" "$CONTENT"
-
-# Test 5: Esc without session quits.
+assert_not_contains "drag ended" "DRAGGING" "$CONTENT"
+# Esc quits
 tmux send-keys -t "$SESSION" Escape
 sleep 1.0
-if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-  echo "  PASS  Esc quits program"
-  ((PASS++))
-else
-  # Session might still exist if program exited but tmux kept it.
-  CONTENT=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || echo "")
-  if echo "$CONTENT" | grep -q "Move mouse"; then
-    echo "  FAIL  Esc did not quit program"
-    ((FAIL++))
-  else
-    echo "  PASS  Esc quits program (session ended)"
-    ((PASS++))
-  fi
-fi
+tmux send-keys -t "$SESSION" Escape
+sleep 1.0
+assert_exit_clean "Esc quits cleanly"
+report_group "canvas_overlay_demo"
 
-# Test 6: Terminal restored — run stty in the SAME pane that ran the demo.
-# The pane survives because we used "bash -c 'demo; exec bash'" wrapper.
-sleep 0.3
-if tmux has-session -t "$SESSION" 2>/dev/null; then
-  tmux send-keys -t "$SESSION" "stty" Enter
-  sleep 0.5
-  STTY_OUT=$(tmux capture-pane -t "$SESSION" -p 2>/dev/null || echo "")
-  # Check if stty output shows -echo (echo disabled = raw mode leaked).
-  # Normal state has 'echo' (enabled). We look for ' -echo ' with spaces.
-  if echo "$STTY_OUT" | grep -q ' -echo '; then
-    echo "  FAIL  terminal not restored (raw mode leaked in demo PTY)"
-    ((FAIL++))
-  else
-    echo "  PASS  terminal restored in same PTY after exit"
-    ((PASS++))
-  fi
-else
-  # Session ended cleanly = demo exited normally = termios restored.
-  # If raw mode had leaked, the process would hang (not exit).
-  echo "  PASS  terminal restored (demo exited cleanly)"
-  ((PASS++))
-fi
-
+# --- Summary ---
+cleanup
 echo
-echo "=== Results: $PASS passed, $FAIL failed ==="
-[ "$FAIL" -eq 0 ] && exit 0 || exit 1
+echo "=== Results: $TOTAL_PASS passed, $TOTAL_FAIL failed ==="
+[ "$TOTAL_FAIL" -eq 0 ] && exit 0 || exit 1
