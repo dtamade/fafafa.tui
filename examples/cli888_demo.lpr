@@ -129,7 +129,7 @@ begin
   Inc(ThinkTick); Inc(SpinnerTick);
   ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' Thinking...';
   if ThinkTick >= 25 then begin
-    Dec(MsgCount);
+    if MsgCount > 0 then Dec(MsgCount);
     if (ResponseIdx mod 2) = 0 then begin
       ToolStatusLine := SPINNER[SpinnerTick mod 10] + ' ' + SYM_TOOL + ' Read src/main.pas';
       AddMsg(mrTool, 'Read src/main.pas ' + SYM_CHECK);
@@ -158,6 +158,13 @@ end;
 procedure SendMessage;
 begin
   if Length(Editor.Content) = 0 then Exit;
+  // Record in input history.
+  if InputHistCount < Length(InputHistory) then
+  begin
+    InputHistory[InputHistCount] := Editor.Content;
+    Inc(InputHistCount);
+  end;
+  InputHistIdx := -1;
   AddMsg(mrUser, Editor.Content);
   Inc(TokenCount, Length(Editor.Content) div 4);
   if Editor.Content = '/help' then AddMsg(mrSystem, 'Commands: /help /clear /model /quit | Ctrl+L clear | Ctrl+D quit | ' + #$E2#$86#$91#$E2#$86#$93 + ' history')
@@ -280,16 +287,16 @@ begin
   if MsgCount = 0 then begin
     J := MsgArea.Height div 3;
     Frame.Buffer.SetStringN(
-      MsgArea.X + (MsgArea.Width - 7) div 2, MsgArea.Y + J,
+      MsgArea.X + (Integer(MsgArea.Width) - 6) div 2, MsgArea.Y + J,
       'cli888', MsgArea.Width, TStyle.Default.WithFg(clGreen).WithModifier([mbBold]));
     Frame.Buffer.SetStringN(
-      MsgArea.X + (MsgArea.Width - 34) div 2, MsgArea.Y + J + 2,
+      MsgArea.X + (Integer(MsgArea.Width) - 29) div 2, MsgArea.Y + J + 2,
       'AI-powered terminal assistant', MsgArea.Width, TStyle.Default.WithFg(clGray));
     Frame.Buffer.SetStringN(
-      MsgArea.X + (MsgArea.Width - 45) div 2, MsgArea.Y + J + 4,
+      MsgArea.X + (Integer(MsgArea.Width) - 47) div 2, MsgArea.Y + J + 4,
       'Type a message and press Enter to get started.', MsgArea.Width, TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]));
     Frame.Buffer.SetStringN(
-      MsgArea.X + (MsgArea.Width - 40) div 2, MsgArea.Y + J + 5,
+      MsgArea.X + (Integer(MsgArea.Width) - 31) div 2, MsgArea.Y + J + 5,
       '/ for commands, Ctrl+C to quit.', MsgArea.Width, TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]));
   end;
 
@@ -365,7 +372,7 @@ begin
   StatusLeft := ' ' + CwdPath;
   StatusRight := ModelName + ' ';
   Frame.Buffer.SetStringN(InnerX, CurY, StatusLeft, InnerW, TStyle.Default.WithFg(clDarkGray));
-  Frame.Buffer.SetStringN(InnerX + InnerW - Length(StatusRight), CurY, StatusRight, Length(StatusRight),
+  Frame.Buffer.SetStringN(InnerX + InnerW - GraphemeWidth(StatusRight), CurY, StatusRight, GraphemeWidth(StatusRight),
     TStyle.Default.WithFg(clWhite).WithModifier([mbBold]));
   Inc(CurY);
   // Row 2: hints + state.
@@ -377,7 +384,7 @@ begin
     asSlashMenu: StateRight := '/ Menu ';
   end;
   Frame.Buffer.SetStringN(InnerX, CurY, HintLeft, InnerW, TStyle.Default.WithFg(clDarkGray));
-  Frame.Buffer.SetStringN(InnerX + InnerW - Length(StateRight), CurY, StateRight, Length(StateRight),
+  Frame.Buffer.SetStringN(InnerX + InnerW - GraphemeWidth(StateRight), CurY, StateRight, GraphemeWidth(StateRight),
     TStyle.Default.WithFg(clCyan));
   Inc(CurY);
 
@@ -418,11 +425,16 @@ begin
     else end;
     Exit;
   end;
-  if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin Term.RequestQuit; Exit; end;
+  if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin
+    if State in [asThinking, asStreaming] then begin
+      State := asIdle; ToolStatusLine := ''; if MsgCount > 0 then Dec(MsgCount);
+    end else Term.RequestQuit;
+    Exit;
+  end;
   if (K.Code = kcChar) and (K.Ch = Ord('l')) and (kmCtrl in K.Modifiers) then begin MsgCount := 0; ScrollOffset := 0; Exit; end;
   if (K.Code = kcChar) and (K.Ch = Ord('d')) and (kmCtrl in K.Modifiers) then begin if Editor.IsEmpty then Term.RequestQuit; Exit; end;
   case K.Code of
-    kcEsc: Term.RequestQuit;
+    kcEsc: if not Editor.IsEmpty then Editor.Clear else Term.RequestQuit;
     kcEnter:
       if State = asIdle then begin
         if (kmShift in K.Modifiers) or (kmAlt in K.Modifiers) then
@@ -473,7 +485,7 @@ begin
       end;
     kcHome: Editor.MoveHome;
     kcEnd: Editor.MoveEnd;
-    kcPageUp: Inc(ScrollOffset, 5);
+    kcPageUp: begin Inc(ScrollOffset, 5); if ScrollOffset > MsgCount then ScrollOffset := MsgCount; end;
     kcPageDown: begin Dec(ScrollOffset, 5); if ScrollOffset < 0 then ScrollOffset := 0; end;
   else end;
 end;
@@ -506,7 +518,7 @@ begin
       case Ev.Kind of
         evKey: HandleKey(Ev.Key);
         evMouse: case Ev.Mouse.Kind of
-          mkScrollUp: Inc(ScrollOffset);
+          mkScrollUp: begin Inc(ScrollOffset); if ScrollOffset > MsgCount then ScrollOffset := MsgCount; end;
           mkScrollDown: begin Dec(ScrollOffset); if ScrollOffset < 0 then ScrollOffset := 0; end;
         else end;
       else end;
