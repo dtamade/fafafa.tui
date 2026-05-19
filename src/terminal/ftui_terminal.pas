@@ -271,19 +271,12 @@ var
   Patches: TDiffEntries;
   Tmp: TBuffer;
 begin
-  // Merge: copy base into merged, then apply overlay on top.
-  FMerged.Reset;
-  FOverlay.MergeInto(FCurr, FMerged);
-  // For cells not in overlay, copy from FCurr.
-  // (MergeInto only writes marked cells; we need the rest from base.)
-  // Simpler: just diff FCurr with overlay applied.
-  // Actually: MergeInto overwrites marked cells in Dest.  But Dest
-  // was Reset (all CellEmpty).  We need Dest = copy of FCurr first.
-  // Fix: copy FCurr into FMerged, then overlay on top.
+  // Merge: copy base (FCurr) into FMerged, then apply overlay on top.
   Move(FCurr.CellAt(FCurr.Area.X, FCurr.Area.Y)^,
        FMerged.CellAt(FMerged.Area.X, FMerged.Area.Y)^,
        FCurr.Length_ * SizeOf(TCell));
   FOverlay.MergeInto(FCurr, FMerged);
+  // Diff merged (what screen should show) against prev (what screen shows now).
   FPrev.Diff(FMerged, Patches);
   FBackend.DrawPatches(Patches);
   if F.HasCursor then
@@ -295,11 +288,11 @@ begin
     FBackend.HideCursor;
   FBackend.Flush;
 
-  // Swap prev/curr — next frame paints onto the old prev (cheap),
-  // and the now-old curr becomes the reference for the diff.
+  // Swap: FMerged becomes new prev (it is what the terminal now shows).
+  // FCurr and FMerged swap roles for next frame.
   Tmp := FPrev;
-  FPrev := FCurr;
-  FCurr := Tmp;
+  FPrev := FMerged;
+  FMerged := Tmp;
 end;
 
 procedure TTerminal.RequestQuit;
