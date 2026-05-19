@@ -369,14 +369,14 @@ begin
     Frame.Buffer.SetStyle(TRect.Make(InnerX, CurY + I, InnerW, 1), TStyle.Default.WithFg(clDarkGray));
   end;
   // Row 1: CWD + model.
-  StatusLeft := ' ' + CwdPath;
+  StatusLeft := ' ' + CwdPath + '  [' + IntToStr(TokenCount) + ' tokens]';
   StatusRight := ModelName + ' ';
   Frame.Buffer.SetStringN(InnerX, CurY, StatusLeft, InnerW, TStyle.Default.WithFg(clDarkGray));
   Frame.Buffer.SetStringN(InnerX + InnerW - GraphemeWidth(StatusRight), CurY, StatusRight, GraphemeWidth(StatusRight),
     TStyle.Default.WithFg(clWhite).WithModifier([mbBold]));
   Inc(CurY);
   // Row 2: hints + state.
-  HintLeft := ' Enter send  / cmds  Ctrl+C quit';
+  HintLeft := ' Enter send  / cmds  Ctrl+C cancel/quit  Esc clear';
   case State of
     asIdle:      StateRight := 'Idle ';
     asThinking:  StateRight := SPINNER[SpinnerTick mod 10] + ' Thinking ';
