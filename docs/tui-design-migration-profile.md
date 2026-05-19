@@ -166,7 +166,7 @@ end;
 | 不支持 1003h 的终端 | ❌ | ❌ | 降级到 click+wheel only |
 
 **降级检测**：`TTerminal.HasMouseTracking: Boolean`（optimistic flag：表示已请求开启 1003h，不代表终端确实支持。几乎所有现代终端都支持，无需据此禁用功能）。
-**显式降级**：消费方可查询 `HasMouseTracking` 决定是否启用 hover/drag 功能。
+**真实支持度判断**：以是否收到 mkMoved / mkDrag 事件为准，不依赖 HasMouseTracking flag。
 
 ## 8. Interaction Session 合同
 

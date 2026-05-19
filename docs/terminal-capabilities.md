@@ -65,9 +65,8 @@ TTerminal.HasMouseTracking: Boolean;    // optimistic: 已请求开启 1003h（�
 TTerminal.HasTruecolor: Boolean;        // 检测 $COLORTERM
 TTerminal.HasKittyKeyboard: Boolean;    // $TERM_PROGRAM 乐观推断（kitty/wezterm/ghostty）
 ```
-
-消费方根据这些 flag 决定：
-- `HasMouseTracking = False` → 终端可能不支持 motion tracking（但极少见于现代终端）
+消费方参考（注意：这些是 optimistic flag，真实支持度以实际收到的事件为准）：
+- `HasMouseTracking` → 已请求开启 1003h（真实支持度以收到 mkMoved/mkDrag 为准）
 - `HasTruecolor = False` → 用 indexed color 替代 RGB
 - `HasKittyKeyboard = False` → Shift+Enter 降级为 Alt+Enter
 
