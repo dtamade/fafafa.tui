@@ -3,7 +3,6 @@ unit test_terminal_contract;
 // Contract tests for TTerminal main path behaviors.
 // These call TTerminal.PostProcessEvent and PromoteMousePos (test seams,
 // not part of consumer contract) to verify main-path behaviors without a tty.
-// to verify capture/session/PrevMousePos logic without needing a tty.
 
 {$mode objfpc}{$H+}
 
