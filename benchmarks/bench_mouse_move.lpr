@@ -43,7 +43,6 @@ var
   SeqLen: Integer;
   Ev: TEvent;
   Consumed: Integer;
-  R: TParseResult;
   HC: THoverChange;
 
 procedure BuildMovedSeq(X, Y: Integer);
@@ -64,6 +63,8 @@ begin
   Ov := TOverlayBuffer.Create(TRect.Make(0, 0, WIDTH, HEIGHT));
   CanvasArea := TRect.Make(5, 2, 60, 18);
   PrevX := 10; PrevY := 5;
+  SeqLen := 0;
+  FillChar(Seq, SizeOf(Seq), 0);
 
   // Fill base with something.
   Base.SetString(0, 0, 'canvas base content here', TStyle.Default);
@@ -74,7 +75,7 @@ begin
   begin
     // 1. Parse a moved event.
     BuildMovedSeq(10 + (I mod 50), 5 + (I mod 15));
-    R := ParseOne(Seq[0], SeqLen, True, Ev, Consumed);
+    ParseOne(Seq[0], SeqLen, True, Ev, Consumed);
 
     // 2. Detect hover change.
     HC := DetectHoverChange(CanvasArea, PrevX, PrevY, Ev.Mouse.X, Ev.Mouse.Y);

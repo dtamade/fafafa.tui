@@ -79,6 +79,9 @@ end;
 
 procedure CellSetSymbolAscii(var C: TCell; Ch: AnsiChar);
 begin
+  // Only Bytes[0] is written; tail bytes stay as-is from CellReset/CellEmpty
+  // (all zeros).  CellEquals uses full QWord comparison, so callers must
+  // not construct cells without going through CellReset first.
   C.Glyph.Len := 1;
   C.Glyph.Bytes[0] := Byte(Ch);
   C.Width := 1;
@@ -110,16 +113,13 @@ begin
 end;
 
 function CellEquals(const A, B: TCell): Boolean;
+var
+  PA, PB: PQWord;
 begin
-  if A.Width <> B.Width then Exit(False);
-  if A.Skip <> B.Skip then Exit(False);
-  if A.Modifier <> B.Modifier then Exit(False);
-  if not ColorEquals(A.Fg, B.Fg) then Exit(False);
-  if not ColorEquals(A.Bg, B.Bg) then Exit(False);
-  if not ColorEquals(A.Ul, B.Ul) then Exit(False);
-  if A.Glyph.Len <> B.Glyph.Len then Exit(False);
-  if A.Glyph.Len = 0 then Exit(True);
-  Result := CompareByte(A.Glyph.Bytes[0], B.Glyph.Bytes[0], A.Glyph.Len) = 0;
+  PA := @A;
+  PB := @B;
+  Result := (PA[0] = PB[0]) and (PA[1] = PB[1]) and (PA[2] = PB[2]) and
+            (PA[3] = PB[3]) and (PA[4] = PB[4]);
 end;
 
 function CellGlyphAsString(const C: TCell): AnsiString;

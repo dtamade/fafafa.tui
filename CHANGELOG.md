@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.9.0 (2026-05-19) — M4 性能基准 + cli888 场景测试
+
+### 性能优化
+- bench_diff: 1495μs → 957μs/frame (-36%), 达到 < 1ms 目标
+- CellEquals: 5×QWord 整块比较替代逐字段比较
+- Buffer.Diff: 指针算术 + 内联比较, 消除 mod/div 运算
+- DrawPatches: QWord style 比较, 内联 SGR, GlyphLen=1 fast-path
+- Buffer.Reset: doubling-copy 批量填充
+- AppendByte: 内联 capacity 检查
+- AnsiSgrReset: 预编码常量数组
+- TBuffer.ContentPtr: 无边界检查的直接 cell 访问
+
+### 新增
+- 50 个 cli888 场景 buffer 快照测试 (test_cli888_scenarios.pas)
+- docs/perf-results.md: 完整基准数据 + 分阶段分析
+
+### 测试
+- 总测试数: 267 (从 217 增加 50)
+- 全部 PASS, 0 warning / 0 note
+
+---
+
 ## v0.8.0-rc (2026-05-19) — tui-design 可锁定基线
 
 **这是 tui-design 迁移的推荐锁定版本。**

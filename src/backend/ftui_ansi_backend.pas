@@ -27,7 +27,6 @@ interface
 uses
   ftui_color,
   ftui_modifier,
-  ftui_style,
   ftui_cell,
   ftui_buffer,
   ftui_bytes,
@@ -38,10 +37,7 @@ type
   private
     FFd: LongInt;
     FOut: TByteBuilder;
-    FLastFg, FLastBg, FLastUl: TColor;
-    FLastMod: TModifier;
     FLastInit: Boolean;
-    procedure ApplyCellStyle(const C: TCell);
   public
     constructor Create(AFd: LongInt);
 
@@ -89,10 +85,6 @@ end;
 
 procedure TAnsiBackend.ResetStyleCache;
 begin
-  FLastFg := UnsetColor;
-  FLastBg := UnsetColor;
-  FLastUl := UnsetColor;
-  FLastMod := [];
   FLastInit := False;
 end;
 
@@ -117,46 +109,22 @@ begin
   AnsiMoveTo(FOut, X, Y);
 end;
 
-procedure TAnsiBackend.ApplyCellStyle(const C: TCell);
-var
-  Changed: Boolean;
-begin
-  // Fast path: compare style fields inline.  We check Modifier first
-  // (2 bytes, cheapest) then colors (4 bytes each via LongWord cast).
-  // This is faster than CompareByte (FPC RTL function call overhead)
-  // and faster than 5 separate ColorEquals calls.
-  if FLastInit then
-    Changed := (C.Modifier <> FLastMod) or
-               (not ColorEquals(C.Fg, FLastFg)) or
-               (not ColorEquals(C.Bg, FLastBg)) or
-               (not ColorEquals(C.Ul, FLastUl))
-  else
-    Changed := True;
-  if not Changed then Exit;
-
-  AnsiSgrReset(FOut);
-  if (C.Fg.Kind = ckIndexed) or (C.Fg.Kind = ckRgb) then AnsiSgrFg(FOut, C.Fg);
-  if (C.Bg.Kind = ckIndexed) or (C.Bg.Kind = ckRgb) then AnsiSgrBg(FOut, C.Bg);
-  AnsiSgrModifierAdd(FOut, C.Modifier);
-
-  FLastFg := C.Fg;
-  FLastBg := C.Bg;
-  FLastUl := C.Ul;
-  FLastMod := C.Modifier;
-  FLastInit := True;
-end;
-
 procedure TAnsiBackend.DrawPatches(const Patches: TDiffEntries);
 var
-  I: Integer;
+  I, Count: Integer;
   CurX, CurY: Integer;
   GlyphLen: Integer;
+  CellStyle: PQWord;
+  LastStyle: array[0..1] of QWord;
 begin
+  Count := System.Length(Patches);
+  if Count = 0 then Exit;
   CurX := -1;
   CurY := -1;
-  for I := 0 to High(Patches) do
+  LastStyle[0] := 0;
+  LastStyle[1] := 0;
+  for I := 0 to Count - 1 do
   begin
-    // Move to the patch's coordinates if we're not already there.
     if (Patches[I].X <> CurX) or (Patches[I].Y <> CurY) then
     begin
       AnsiMoveTo(FOut, Patches[I].X, Patches[I].Y);
@@ -164,19 +132,30 @@ begin
       CurY := Patches[I].Y;
     end;
 
-    ApplyCellStyle(Patches[I].Cell);
+    CellStyle := PQWord(@Patches[I].Cell.Fg);
+    if (not FLastInit) or (CellStyle[0] <> LastStyle[0]) or (CellStyle[1] <> LastStyle[1]) then
+    begin
+      AnsiSgrReset(FOut);
+      if (Patches[I].Cell.Fg.Kind = ckIndexed) or (Patches[I].Cell.Fg.Kind = ckRgb) then
+        AnsiSgrFg(FOut, Patches[I].Cell.Fg);
+      if (Patches[I].Cell.Bg.Kind = ckIndexed) or (Patches[I].Cell.Bg.Kind = ckRgb) then
+        AnsiSgrBg(FOut, Patches[I].Cell.Bg);
+      if Patches[I].Cell.Modifier <> [] then
+        AnsiSgrModifierAdd(FOut, Patches[I].Cell.Modifier);
+      LastStyle[0] := CellStyle[0];
+      LastStyle[1] := CellStyle[1];
+      FLastInit := True;
+    end;
 
     GlyphLen := Patches[I].Cell.Glyph.Len;
     if GlyphLen = 0 then
-    begin
-      // Empty glyph -> emit a single space so the cell visually clears.
-      FOut.AppendByte(Ord(' '));
-    end
+      FOut.AppendByte(Ord(' '))
+    else if GlyphLen = 1 then
+      FOut.AppendByte(Patches[I].Cell.Glyph.Bytes[0])
     else
       FOut.AppendBytes(Patches[I].Cell.Glyph.Bytes[0], GlyphLen);
 
-    Inc(CurX);    // we just wrote one column; cursor advanced
-    // M0: width=1 only.  M2 will inc by Cell.Width here.
+    Inc(CurX);
   end;
 end;
 

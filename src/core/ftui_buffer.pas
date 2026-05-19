@@ -50,6 +50,9 @@ type
     function Width: Word; inline;
     function Height: Word; inline;
     function Length_: Integer; inline;       // count of cells
+    // Raw pointer to FContent[0].  Valid until the next Resize or Free.
+    // Callers must not hold this pointer across buffer mutations.
+    function ContentPtr: PCell; inline;
 
     // Read/write access by position.  Returns nil if (X,Y) is outside Area.
     function CellAt(X, Y: Integer): PCell;
@@ -124,6 +127,11 @@ end;
 function TBuffer.Length_: Integer;
 begin
   Result := System.Length(FContent);
+end;
+
+function TBuffer.ContentPtr: PCell;
+begin
+  Result := @FContent[0];
 end;
 
 function TBuffer.IndexOfPos(X, Y: Integer): Integer;
@@ -255,10 +263,21 @@ end;
 
 procedure TBuffer.Reset;
 var
-  I: Integer;
+  I, Total: Integer;
+  Template: array[0..0] of TCell;
 begin
-  for I := 0 to System.Length(FContent) - 1 do
-    FContent[I] := CellEmpty;
+  Total := System.Length(FContent);
+  if Total = 0 then Exit;
+  Template[0] := CellEmpty;
+  FContent[0] := Template[0];
+  I := 1;
+  while I + I <= Total do
+  begin
+    Move(FContent[0], FContent[I], I * SizeOf(TCell));
+    I := I + I;
+  end;
+  if I < Total then
+    Move(FContent[0], FContent[I], (Total - I) * SizeOf(TCell));
 end;
 
 procedure TBuffer.Resize(const ANewArea: TRect);
@@ -295,44 +314,59 @@ var
   Total, I, OutCount, AffectedWidth: Integer;
   ToSkip, Invalidated: Integer;
   Prev, Curr: PCell;
+  PrevBase, CurrBase: PCell;
   Differs: Boolean;
   PosX, PosY: Word;
-{$PUSH}{$R-}{$Q-}    // hot loop: disable range/overflow checks
+  W: Integer;
+{$PUSH}{$R-}{$Q-}
 begin
-  // Buffers must share area dimensions; caller is responsible for
-  // resizing before diffing.  Mismatched sizes degrade to "everything
-  // changed" — we emit the entire next buffer.
   if (Next.FArea.Width <> FArea.Width) or
      (Next.FArea.Height <> FArea.Height) then
   begin
     Total := System.Length(Next.FContent);
     SetLength(Patches, Total);
+    PosX := Next.FArea.X;
+    PosY := Next.FArea.Y;
+    W := Next.FArea.Width;
     for I := 0 to Total - 1 do
     begin
-      Patches[I].X := Next.FArea.X + (I mod Next.FArea.Width);
-      Patches[I].Y := Next.FArea.Y + (I div Next.FArea.Width);
+      Patches[I].X := PosX;
+      Patches[I].Y := PosY;
       Patches[I].Cell := Next.FContent[I];
+      Inc(PosX);
+      if PosX >= Next.FArea.X + W then
+      begin
+        PosX := Next.FArea.X;
+        Inc(PosY);
+      end;
     end;
     Exit;
   end;
 
   Total := System.Length(FContent);
-  SetLength(Patches, Total);     // upper bound; trim at end
+  SetLength(Patches, Total);
   OutCount := 0;
   ToSkip := 0;
   Invalidated := 0;
+  W := FArea.Width;
+  PosX := FArea.X;
+  PosY := FArea.Y;
+  PrevBase := @FContent[0];
+  CurrBase := @Next.FContent[0];
 
   for I := 0 to Total - 1 do
   begin
-    Prev := @FContent[I];
-    Curr := @Next.FContent[I];
+    Prev := PrevBase + I;
+    Curr := CurrBase + I;
 
-    Differs := not CellEquals(Prev^, Curr^);
+    Differs := (PQWord(Prev)[0] <> PQWord(Curr)[0]) or
+               (PQWord(Prev)[1] <> PQWord(Curr)[1]) or
+               (PQWord(Prev)[2] <> PQWord(Curr)[2]) or
+               (PQWord(Prev)[3] <> PQWord(Curr)[3]) or
+               (PQWord(Prev)[4] <> PQWord(Curr)[4]);
 
     if (not Curr^.Skip) and (Differs or (Invalidated > 0)) and (ToSkip = 0) then
     begin
-      PosX := FArea.X + (I mod FArea.Width);
-      PosY := FArea.Y + (I div FArea.Width);
       Patches[OutCount].X := PosX;
       Patches[OutCount].Y := PosY;
       Patches[OutCount].Cell := Curr^;
@@ -349,6 +383,13 @@ begin
     if Prev^.Width > AffectedWidth then AffectedWidth := Prev^.Width;
     if AffectedWidth > Invalidated then Invalidated := AffectedWidth;
     if Invalidated > 0 then Dec(Invalidated);
+
+    Inc(PosX);
+    if PosX >= FArea.X + W then
+    begin
+      PosX := FArea.X;
+      Inc(PosY);
+    end;
   end;
 
   SetLength(Patches, OutCount);

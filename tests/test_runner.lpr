@@ -33,7 +33,8 @@ uses
   test_interaction,
   test_overlay,
   test_scrollbar,
-  test_terminal_contract;
+  test_terminal_contract,
+  test_cli888_scenarios;
 
 var
   Failed: Integer;
@@ -62,6 +63,7 @@ begin
   RegisterOverlayTests;
   RegisterScrollbarTests;
   RegisterTerminalContractTests;
+  RegisterCli888ScenarioTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

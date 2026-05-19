@@ -120,11 +120,12 @@ end;
 
 { SGR helpers }
 
+const
+  CSI_SGR_RESET: array[0..3] of Byte = (27, Ord('['), Ord('0'), Ord('m'));
+
 procedure AnsiSgrReset(var B: TByteBuilder);
 begin
-  // CSI 0 m
-  B.AppendByte(27); B.AppendByte(Ord('['));
-  B.AppendByte(Ord('0')); B.AppendByte(Ord('m'));
+  B.AppendBytes(CSI_SGR_RESET[0], 4);
 end;
 
 // Internal: emit a "named or indexed" foreground.
@@ -133,35 +134,62 @@ end;
 //   Named 8..15 -> SGR 90..97  (bright versions)
 //   Indexed >=16 -> SGR 38;5;N
 procedure EmitIndexedFg(var B: TByteBuilder; Idx: Byte); inline;
+var
+  Buf: array[0..4] of Byte;
 begin
-  B.AppendByte(27); B.AppendByte(Ord('['));
+  Buf[0] := 27;
+  Buf[1] := Ord('[');
   if Idx < 8 then
-    B.AppendUInt(30 + Idx)
+  begin
+    Buf[2] := Ord('3');
+    Buf[3] := Ord('0') + Idx;
+    Buf[4] := Ord('m');
+    B.AppendBytes(Buf[0], 5);
+  end
   else if Idx < 16 then
-    B.AppendUInt(90 + (Idx - 8))
+  begin
+    Buf[2] := Ord('9');
+    Buf[3] := Ord('0') + (Idx - 8);
+    Buf[4] := Ord('m');
+    B.AppendBytes(Buf[0], 5);
+  end
   else
   begin
+    B.AppendBytes(Buf[0], 2);
     B.AppendByte(Ord('3')); B.AppendByte(Ord('8'));
     B.AppendByte(Ord(';')); B.AppendByte(Ord('5')); B.AppendByte(Ord(';'));
     B.AppendUInt(Idx);
+    B.AppendByte(Ord('m'));
   end;
-  B.AppendByte(Ord('m'));
 end;
 
 procedure EmitIndexedBg(var B: TByteBuilder; Idx: Byte); inline;
+var
+  Buf: array[0..5] of Byte;
 begin
-  B.AppendByte(27); B.AppendByte(Ord('['));
+  Buf[0] := 27;
+  Buf[1] := Ord('[');
   if Idx < 8 then
-    B.AppendUInt(40 + Idx)
+  begin
+    Buf[2] := Ord('4');
+    Buf[3] := Ord('0') + Idx;
+    Buf[4] := Ord('m');
+    B.AppendBytes(Buf[0], 5);
+  end
   else if Idx < 16 then
-    B.AppendUInt(100 + (Idx - 8))
+  begin
+    Buf[2] := Ord('1'); Buf[3] := Ord('0'); Buf[4] := Ord('0') + (Idx - 8);
+    Buf[5] := Ord('m');
+    B.AppendBytes(Buf[0], 6);
+  end
   else
   begin
+    B.AppendBytes(Buf[0], 2);
     B.AppendByte(Ord('4')); B.AppendByte(Ord('8'));
     B.AppendByte(Ord(';')); B.AppendByte(Ord('5')); B.AppendByte(Ord(';'));
     B.AppendUInt(Idx);
+    B.AppendByte(Ord('m'));
   end;
-  B.AppendByte(Ord('m'));
 end;
 
 procedure AnsiSgrFg(var B: TByteBuilder; const C: TColor);

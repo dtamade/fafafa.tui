@@ -167,4 +167,17 @@ cli888 主聊天界面骨架可拼。
   - examples/full_demo.lpr：交互式 List 导航 + Enter 选中 + q/Esc 退出 + 滚轮 + resize
   - 总测试 159/159，0 warning / 0 note
   - make acceptance 9/9 通过（tmux PTY 验证 mouse tracking + Esc + termios 恢复）
-- [ ] M4（基准 / 真实 cli888 dump 测试）/ M2.1（utf8proc CJK）待启动
+- [x] **M4 完成（2026-05-19）** ✅
+  - 50 个 cli888 场景 buffer 快照测试（标题栏/消息列表/输入框/状态栏/布局/滚动/边框/样式/边界）
+  - 性能优化：bench_diff 从 1495μs 降到 957μs（-36%）
+  - 优化手段：QWord 比较 / 指针算术 / 内联 SGR / doubling-copy Reset / AppendByte fast-path
+  - 6 个 benchmark 全部 PASS（diff/layout/input/render/mouse_move/diff_profile）
+  - docs/perf-results.md：完整基准数据 + 与 ratatui 对比
+  - 总测试 267/267，0 warning / 0 note
+  - make test+examples+benchmarks 全套 3.5 秒（要求 < 30 秒）
+- [x] **M2.1 完成（2026-05-18）** ✅
+  - 纯 Pascal East Asian Width 表（Unicode 15.0, 无 utf8proc 依赖）
+  - ftui_grapheme: GraphemeAdvance + GraphemeWidth + CodepointWidth
+  - TSpan.Width 走 GraphemeWidth（CJK "你好" = 4 列）
+  - TBuffer.SetStringN UTF-8 路径：width-2 cell + trailing skip cell
+  - 11 个 grapheme 测试覆盖 ASCII/CJK/emoji/fullwidth/mixed
