@@ -109,7 +109,8 @@ end;
 
 procedure TByteBuilder.AppendByte(B: Byte);
 begin
-  EnsureCapacity(FLen + 1);
+  if FLen >= System.Length(FData) then
+    EnsureCapacity(FLen + 1);
   FData[FLen] := B;
   Inc(FLen);
 end;

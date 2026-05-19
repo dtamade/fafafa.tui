@@ -53,7 +53,7 @@ begin
   for Y := 0 to HEIGHT - 1 do
     for X := 0 to WIDTH - 1 do
     begin
-      CP := Prev.CellAt(X, Y);
+      CP := Prev.ContentPtr + (Y * WIDTH + X);
       CellSetSymbolAscii(CP^, AnsiChar(Ord('A') + ((X + Y) mod 26)));
     end;
 
@@ -73,13 +73,12 @@ begin
     for Y := 0 to HEIGHT - 1 do
       for X := 0 to WIDTH - 1 do
       begin
-        CP := Curr.CellAt(X, Y);
+        CP := Curr.ContentPtr + (Y * WIDTH + X);
         CellSetSymbolAscii(CP^, AnsiChar(Ch));
         CellApplyStyle(CP^, Sty);
         // Vary some cells to make diff non-trivial but not 100% changed.
         if ((X xor Y xor Frame) and 3) = 0 then
         begin
-          CP := Curr.CellAt(X, Y);
           CellSetSymbolAscii(CP^, AnsiChar(Ord('A') + ((X + Y) mod 26)));
           CellApplyStyle(CP^, TStyle.Default);
         end;

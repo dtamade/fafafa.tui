@@ -69,6 +69,7 @@ type
     FPrev, FCurr, FMerged: TBuffer;
     FOverlay: TOverlayBuffer;
     FFrame: TFrame;
+    FPatches: TDiffEntries;
     FInRawMode: Boolean;
     FSavedTermios: TermIOS;
     FInputQueue: array of Byte;
@@ -268,7 +269,7 @@ end;
 
 procedure TTerminal.EndFrame(const F: TFrame);
 var
-  Patches: TDiffEntries;
+  PatchCount: Integer;
   Tmp: TBuffer;
 begin
   // Merge: copy base into merged, then apply overlay on top.
@@ -284,8 +285,8 @@ begin
        FMerged.CellAt(FMerged.Area.X, FMerged.Area.Y)^,
        FCurr.Length_ * SizeOf(TCell));
   FOverlay.MergeInto(FCurr, FMerged);
-  FPrev.Diff(FMerged, Patches);
-  FBackend.DrawPatches(Patches);
+  PatchCount := FPrev.DiffInto(FMerged, FPatches);
+  FBackend.DrawPatchesN(FPatches, PatchCount);
   if F.HasCursor then
   begin
     FBackend.ShowCursor;
