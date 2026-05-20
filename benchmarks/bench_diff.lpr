@@ -33,10 +33,10 @@ var
   Backend: TAnsiBackend;
   Patches: TDiffEntries;
   Frame, X, Y: Integer;
-  StartTick, EndTick: Int64;
+  StartTick, EndTick, Freq: Int64;
   TotalMs, PerFrameUs: Double;
   TotalBytes: Int64;
-  CP, Base: PCell;
+  CP: PCell;
   Sty: TStyle;
   Ch: Byte;
 
@@ -50,15 +50,15 @@ begin
   TotalBytes := 0;
 
   // Warm up: fill Prev with something so the first diff isn't trivially "all changed".
-  Base := Prev.ContentPtr;
   for Y := 0 to HEIGHT - 1 do
     for X := 0 to WIDTH - 1 do
     begin
-      CP := Base + (Y * WIDTH + X);
+      CP := Prev.ContentPtr + (Y * WIDTH + X);
       CellSetSymbolAscii(CP^, AnsiChar(Ord('A') + ((X + Y) mod 26)));
     end;
 
   // Benchmark loop.
+  Freq := 0;
   {$IFDEF LINUX}
   // Use clock_gettime for nanosecond precision.
   {$ENDIF}
@@ -70,11 +70,10 @@ begin
     // We vary by frame index so the diff actually has work to do.
     Sty := TStyle.Default.WithFg(IndexedColor(Byte(Frame mod 7) + 1));
     Ch := Byte(Ord('a') + (Frame mod 26));
-    Base := Curr.ContentPtr;
     for Y := 0 to HEIGHT - 1 do
       for X := 0 to WIDTH - 1 do
       begin
-        CP := Base + (Y * WIDTH + X);
+        CP := Curr.ContentPtr + (Y * WIDTH + X);
         CellSetSymbolAscii(CP^, AnsiChar(Ch));
         CellApplyStyle(CP^, Sty);
         // Vary some cells to make diff non-trivial but not 100% changed.

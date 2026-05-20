@@ -38,6 +38,7 @@ type
     FFd: LongInt;
     FOut: TByteBuilder;
     FLastInit: Boolean;
+    FLastStyle: array[0..1] of QWord;
   public
     constructor Create(AFd: LongInt);
 
@@ -59,6 +60,8 @@ type
     // order so adjacent cells in the same row reuse the cursor without
     // emitting another MoveTo.
     procedure DrawPatches(const Patches: TDiffEntries);
+    // Like DrawPatches but only processes the first Count entries.
+    procedure DrawPatchesN(const Patches: TDiffEntries; Count: Integer);
 
     // Flush the byte buffer to the fd in one syscall (or a few, on
     // EINTR / partial writes).  Returns False if the write ultimately
@@ -86,6 +89,8 @@ end;
 procedure TAnsiBackend.ResetStyleCache;
 begin
   FLastInit := False;
+  FLastStyle[0] := 0;
+  FLastStyle[1] := 0;
 end;
 
 procedure TAnsiBackend.HideCursor;     begin AnsiHideCursor(FOut); end;
@@ -110,19 +115,20 @@ begin
 end;
 
 procedure TAnsiBackend.DrawPatches(const Patches: TDiffEntries);
+begin
+  DrawPatchesN(Patches, System.Length(Patches));
+end;
+
+procedure TAnsiBackend.DrawPatchesN(const Patches: TDiffEntries; Count: Integer);
 var
-  I, Count: Integer;
+  I: Integer;
   CurX, CurY: Integer;
   GlyphLen: Integer;
   CellStyle: PQWord;
-  LastStyle: array[0..1] of QWord;
 begin
-  Count := System.Length(Patches);
   if Count = 0 then Exit;
   CurX := -1;
   CurY := -1;
-  LastStyle[0] := 0;
-  LastStyle[1] := 0;
   for I := 0 to Count - 1 do
   begin
     if (Patches[I].X <> CurX) or (Patches[I].Y <> CurY) then
@@ -133,7 +139,7 @@ begin
     end;
 
     CellStyle := PQWord(@Patches[I].Cell.Fg);
-    if (not FLastInit) or (CellStyle[0] <> LastStyle[0]) or (CellStyle[1] <> LastStyle[1]) then
+    if (not FLastInit) or (CellStyle[0] <> FLastStyle[0]) or (CellStyle[1] <> FLastStyle[1]) then
     begin
       AnsiSgrReset(FOut);
       if (Patches[I].Cell.Fg.Kind = ckIndexed) or (Patches[I].Cell.Fg.Kind = ckRgb) then
@@ -142,8 +148,8 @@ begin
         AnsiSgrBg(FOut, Patches[I].Cell.Bg);
       if Patches[I].Cell.Modifier <> [] then
         AnsiSgrModifierAdd(FOut, Patches[I].Cell.Modifier);
-      LastStyle[0] := CellStyle[0];
-      LastStyle[1] := CellStyle[1];
+      FLastStyle[0] := CellStyle[0];
+      FLastStyle[1] := CellStyle[1];
       FLastInit := True;
     end;
 

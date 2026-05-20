@@ -1,0 +1,6 @@
+- [项目 / fafafa.tui](project_fafafa_tui.md) — 通用 TUI 运行时，v0.8.0-rc，217 tests + 9 PTY acceptance
+- [项目 / 下次会话计划](project_ftui_next_session.md) — 文档债务 + Codex 审查中严重度修复
+- [项目 / tui-design 需求](project_tui_design_request.md) — tui-design 承接需求清单
+- [Feedback / 高性能纪律](feedback_ftui_performance.md) — 热路径只用数组和 packed record
+- [Feedback / 优雅纪律](feedback_ftui_elegance.md) — API 简洁、命名一致、范围克制
+- [Feedback / 用 Codex 审查](feedback_use_codex.md) — review 和困难任务中积极求助 Codex

@@ -21,6 +21,7 @@ unit ftui_buffer;
 interface
 
 uses
+  SysUtils,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -50,8 +51,6 @@ type
     function Width: Word; inline;
     function Height: Word; inline;
     function Length_: Integer; inline;       // count of cells
-    // Raw pointer to FContent[0].  Valid until the next Resize or Free.
-    // Callers must not hold this pointer across buffer mutations.
     function ContentPtr: PCell; inline;
 
     // Read/write access by position.  Returns nil if (X,Y) is outside Area.
@@ -84,6 +83,11 @@ type
     // backend to play back.  Allocations: a single SetLength on the
     // output array.
     procedure Diff(const Next: TBuffer; out Patches: TDiffEntries);
+
+    // Like Diff but reuses the Patches array across calls (only grows,
+    // never shrinks).  Returns the number of valid entries.  Hot-path
+    // callers should prefer this to avoid per-frame allocation.
+    function DiffInto(const Next: TBuffer; var Patches: TDiffEntries): Integer;
 
     // Test helpers — never call from production code.
     function RowAsString(Y: Integer): AnsiString;
@@ -264,12 +268,10 @@ end;
 procedure TBuffer.Reset;
 var
   I, Total: Integer;
-  Template: array[0..0] of TCell;
 begin
   Total := System.Length(FContent);
   if Total = 0 then Exit;
-  Template[0] := CellEmpty;
-  FContent[0] := Template[0];
+  FContent[0] := CellEmpty;
   I := 1;
   while I + I <= Total do
   begin
@@ -315,9 +317,10 @@ var
   ToSkip, Invalidated: Integer;
   Prev, Curr: PCell;
   PrevBase, CurrBase: PCell;
+  PrevRow, CurrRow: PCell;
   Differs: Boolean;
   PosX, PosY: Word;
-  W: Integer;
+  W, Row, Col, RowBytes: Integer;
 {$PUSH}{$R-}{$Q-}
 begin
   if (Next.FArea.Width <> FArea.Width) or
@@ -349,50 +352,151 @@ begin
   ToSkip := 0;
   Invalidated := 0;
   W := FArea.Width;
-  PosX := FArea.X;
-  PosY := FArea.Y;
+  RowBytes := W * SizeOf(TCell);
   PrevBase := @FContent[0];
   CurrBase := @Next.FContent[0];
 
-  for I := 0 to Total - 1 do
+  for Row := 0 to FArea.Height - 1 do
   begin
-    Prev := PrevBase + I;
-    Curr := CurrBase + I;
+    PrevRow := PrevBase + (Row * W);
+    CurrRow := CurrBase + (Row * W);
 
-    Differs := (PQWord(Prev)[0] <> PQWord(Curr)[0]) or
-               (PQWord(Prev)[1] <> PQWord(Curr)[1]) or
-               (PQWord(Prev)[2] <> PQWord(Curr)[2]) or
-               (PQWord(Prev)[3] <> PQWord(Curr)[3]) or
-               (PQWord(Prev)[4] <> PQWord(Curr)[4]);
+    if (Invalidated = 0) and (ToSkip = 0) and
+       CompareMem(PrevRow, CurrRow, RowBytes) then
+      Continue;
 
-    if (not Curr^.Skip) and (Differs or (Invalidated > 0)) and (ToSkip = 0) then
+    PosY := FArea.Y + Row;
+    for Col := 0 to W - 1 do
     begin
-      Patches[OutCount].X := PosX;
-      Patches[OutCount].Y := PosY;
-      Patches[OutCount].Cell := Curr^;
-      Inc(OutCount);
-    end;
+      PosX := FArea.X + Col;
+      Prev := PrevRow + Col;
+      Curr := CurrRow + Col;
 
-    if ToSkip > 0 then
-      Dec(ToSkip)
-    else
-      ToSkip := Curr^.Width - 1;
-    if ToSkip < 0 then ToSkip := 0;
+      Differs := (PQWord(Prev)[0] <> PQWord(Curr)[0]) or
+                 (PQWord(Prev)[1] <> PQWord(Curr)[1]) or
+                 (PQWord(Prev)[2] <> PQWord(Curr)[2]) or
+                 (PQWord(Prev)[3] <> PQWord(Curr)[3]) or
+                 (PQWord(Prev)[4] <> PQWord(Curr)[4]);
 
-    AffectedWidth := Curr^.Width;
-    if Prev^.Width > AffectedWidth then AffectedWidth := Prev^.Width;
-    if AffectedWidth > Invalidated then Invalidated := AffectedWidth;
-    if Invalidated > 0 then Dec(Invalidated);
+      if (not Curr^.Skip) and (Differs or (Invalidated > 0)) and (ToSkip = 0) then
+      begin
+        Patches[OutCount].X := PosX;
+        Patches[OutCount].Y := PosY;
+        Patches[OutCount].Cell := Curr^;
+        Inc(OutCount);
+      end;
 
-    Inc(PosX);
-    if PosX >= FArea.X + W then
-    begin
-      PosX := FArea.X;
-      Inc(PosY);
+      if ToSkip > 0 then
+        Dec(ToSkip)
+      else
+        ToSkip := Curr^.Width - 1;
+      if ToSkip < 0 then ToSkip := 0;
+
+      AffectedWidth := Curr^.Width;
+      if Prev^.Width > AffectedWidth then AffectedWidth := Prev^.Width;
+      if AffectedWidth > Invalidated then Invalidated := AffectedWidth;
+      if Invalidated > 0 then Dec(Invalidated);
     end;
   end;
 
   SetLength(Patches, OutCount);
+{$POP}
+end;
+
+function TBuffer.DiffInto(const Next: TBuffer; var Patches: TDiffEntries): Integer;
+var
+  Total, OutCount, AffectedWidth: Integer;
+  ToSkip, Invalidated: Integer;
+  Prev, Curr: PCell;
+  PrevBase, CurrBase: PCell;
+  PrevRow, CurrRow: PCell;
+  Differs: Boolean;
+  PosX, PosY: Word;
+  W, Row, Col, RowBytes: Integer;
+{$PUSH}{$R-}{$Q-}
+begin
+  Total := System.Length(FContent);
+  if (Next.FArea.Width <> FArea.Width) or
+     (Next.FArea.Height <> FArea.Height) then
+    Total := System.Length(Next.FContent);
+
+  if System.Length(Patches) < Total then
+    SetLength(Patches, Total);
+
+  if (Next.FArea.Width <> FArea.Width) or
+     (Next.FArea.Height <> FArea.Height) then
+  begin
+    PosX := Next.FArea.X;
+    PosY := Next.FArea.Y;
+    W := Next.FArea.Width;
+    for Col := 0 to Total - 1 do
+    begin
+      Patches[Col].X := PosX;
+      Patches[Col].Y := PosY;
+      Patches[Col].Cell := Next.FContent[Col];
+      Inc(PosX);
+      if PosX >= Next.FArea.X + W then
+      begin
+        PosX := Next.FArea.X;
+        Inc(PosY);
+      end;
+    end;
+    Result := Total;
+    Exit;
+  end;
+
+  OutCount := 0;
+  ToSkip := 0;
+  Invalidated := 0;
+  W := FArea.Width;
+  RowBytes := W * SizeOf(TCell);
+  PrevBase := @FContent[0];
+  CurrBase := @Next.FContent[0];
+
+  for Row := 0 to FArea.Height - 1 do
+  begin
+    PrevRow := PrevBase + (Row * W);
+    CurrRow := CurrBase + (Row * W);
+
+    if (Invalidated = 0) and (ToSkip = 0) and
+       CompareMem(PrevRow, CurrRow, RowBytes) then
+      Continue;
+
+    PosY := FArea.Y + Row;
+    for Col := 0 to W - 1 do
+    begin
+      PosX := FArea.X + Col;
+      Prev := PrevRow + Col;
+      Curr := CurrRow + Col;
+
+      Differs := (PQWord(Prev)[0] <> PQWord(Curr)[0]) or
+                 (PQWord(Prev)[1] <> PQWord(Curr)[1]) or
+                 (PQWord(Prev)[2] <> PQWord(Curr)[2]) or
+                 (PQWord(Prev)[3] <> PQWord(Curr)[3]) or
+                 (PQWord(Prev)[4] <> PQWord(Curr)[4]);
+
+      if (not Curr^.Skip) and (Differs or (Invalidated > 0)) and (ToSkip = 0) then
+      begin
+        Patches[OutCount].X := PosX;
+        Patches[OutCount].Y := PosY;
+        Patches[OutCount].Cell := Curr^;
+        Inc(OutCount);
+      end;
+
+      if ToSkip > 0 then
+        Dec(ToSkip)
+      else
+        ToSkip := Curr^.Width - 1;
+      if ToSkip < 0 then ToSkip := 0;
+
+      AffectedWidth := Curr^.Width;
+      if Prev^.Width > AffectedWidth then AffectedWidth := Prev^.Width;
+      if AffectedWidth > Invalidated then Invalidated := AffectedWidth;
+      if Invalidated > 0 then Dec(Invalidated);
+    end;
+  end;
+
+  Result := OutCount;
 {$POP}
 end;
 
