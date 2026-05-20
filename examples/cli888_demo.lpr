@@ -353,6 +353,7 @@ begin
   Editor.Render(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight), Frame.Buffer,
     TStyle.Default.Patch(TStyle.Default),
     TStyle.Default.WithFg(clDarkGray).WithModifier([mbItalic]).Patch(TStyle.Default),
+    TStyle.Default.WithBg(clBlue).WithFg(clWhite),
     PLACEHOLDER);
   Frame.HasCursor := (State = asIdle) or (State = asSlashMenu);
   Frame.CursorPos := Editor.CursorScreenPos(TRect.Make(InnerX + 3, CurY, InnerW - 3, InputHeight));
@@ -428,11 +429,14 @@ begin
   if (K.Code = kcChar) and (K.Ch = Ord('c')) and (kmCtrl in K.Modifiers) then begin
     if State in [asThinking, asStreaming] then begin
       State := asIdle; ToolStatusLine := ''; if MsgCount > 0 then Dec(MsgCount);
-    end else Term.RequestQuit;
+    end else if not Editor.IsEmpty then
+      Editor.HandleKey(K)
+    else
+      Term.RequestQuit;
     Exit;
   end;
   if (K.Code = kcChar) and (K.Ch = Ord('l')) and (kmCtrl in K.Modifiers) then begin MsgCount := 0; ScrollOffset := 0; Exit; end;
-  if (K.Code = kcChar) and (K.Ch = Ord('d')) and (kmCtrl in K.Modifiers) then begin if Editor.IsEmpty then Term.RequestQuit; Exit; end;
+  if (K.Code = kcChar) and (K.Ch = Ord('d')) and (kmCtrl in K.Modifiers) then begin if Editor.IsEmpty then Term.RequestQuit else Editor.HandleKey(K); Exit; end;
   case K.Code of
     kcEsc: if not Editor.IsEmpty then Editor.Clear else Term.RequestQuit;
     kcEnter:
@@ -442,17 +446,21 @@ begin
         else
           SendMessage;
       end;
-    kcBackspace: if State = asIdle then Editor.DeleteBackward;
-    kcDelete: if State = asIdle then Editor.DeleteForward;
+    kcBackspace: if State = asIdle then Editor.HandleKey(K);
+    kcDelete: if State = asIdle then Editor.HandleKey(K);
     kcChar: if (State = asIdle) and (K.Ch >= 32) then begin
-      Editor.InsertChar(K.Ch);
-      if Editor.Content = '/' then begin State := asSlashMenu; SlashMenuSel := 0; end;
+      if kmCtrl in K.Modifiers then
+        Editor.HandleKey(K)
+      else begin
+        Editor.InsertChar(K.Ch);
+        if Editor.Content = '/' then begin State := asSlashMenu; SlashMenuSel := 0; end;
+      end;
     end;
-    kcLeft: Editor.MoveLeft;
-    kcRight: Editor.MoveRight;
+    kcLeft: Editor.HandleKey(K);
+    kcRight: Editor.HandleKey(K);
     kcUp:
       if Editor.LineCount > 1 then
-        Editor.MoveUp
+        Editor.HandleKey(K)
       else begin
         // Input history: ↑ browses previous messages.
         if InputHistIdx < 0 then begin
@@ -468,7 +476,7 @@ begin
       end;
     kcDown:
       if Editor.LineCount > 1 then
-        Editor.MoveDown
+        Editor.HandleKey(K)
       else begin
         // Input history: ↓ browses forward.
         if InputHistIdx >= 0 then begin
@@ -483,8 +491,8 @@ begin
               Editor.InsertChar(Ord(InputHistory[InputHistIdx][I]));
         end;
       end;
-    kcHome: Editor.MoveHome;
-    kcEnd: Editor.MoveEnd;
+    kcHome: Editor.HandleKey(K);
+    kcEnd: Editor.HandleKey(K);
     kcPageUp: begin Inc(ScrollOffset, 5); if ScrollOffset > MsgCount then ScrollOffset := MsgCount; end;
     kcPageDown: begin Dec(ScrollOffset, 5); if ScrollOffset < 0 then ScrollOffset := 0; end;
   else end;
