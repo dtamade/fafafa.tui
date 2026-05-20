@@ -273,6 +273,204 @@ begin
   finally Buf.Free; E.Free; end;
 end;
 
+{ === Selection tests === }
+
+procedure Test_SelectionShiftRight;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.InsertChar(Ord('c'));
+    E.MoveHome;
+    E.HandleKey(KeyCodeEvent(kcRight, [kmShift]).Key);
+    E.HandleKey(KeyCodeEvent(kcRight, [kmShift]).Key);
+    E.CopySelection;
+    E.MoveEnd;
+    E.Paste;
+    AssertEqStr('abcab', E.Content, 'selected ab, pasted at end');
+  finally E.Free; end;
+end;
+
+procedure Test_SelectionShiftLeft;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.InsertChar(Ord('c'));
+    E.HandleKey(KeyCodeEvent(kcLeft, [kmShift]).Key);
+    E.HandleKey(KeyCodeEvent(kcLeft, [kmShift]).Key);
+    E.CutSelection;
+    AssertEqStr('a', E.Content, 'cut bc');
+  finally E.Free; end;
+end;
+
+procedure Test_SelectAll;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('h'));
+    E.InsertChar(Ord('i'));
+    E.SelectAll;
+    E.CutSelection;
+    AssertTrue(E.IsEmpty, 'select all + cut = empty');
+  finally E.Free; end;
+end;
+
+procedure Test_TypeReplacesSelection;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.InsertChar(Ord('c'));
+    E.SelectAll;
+    E.InsertChar(Ord('x'));
+    AssertEqStr('x', E.Content, 'typing replaces selection');
+  finally E.Free; end;
+end;
+
+{ === Undo/Redo tests === }
+
+procedure Test_UndoBasic;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.Undo;
+    AssertEqStr('a', E.Content, 'undo last insert');
+    E.Undo;
+    AssertEqStr('', E.Content, 'undo first insert');
+  finally E.Free; end;
+end;
+
+procedure Test_RedoBasic;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.Undo;
+    E.Redo;
+    AssertEqStr('ab', E.Content, 'redo restores');
+  finally E.Free; end;
+end;
+
+procedure Test_UndoAfterNewEdit;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.Undo;
+    E.InsertChar(Ord('x'));
+    E.Redo;
+    AssertEqStr('ax', E.Content, 'redo cleared after new edit');
+  finally E.Free; end;
+end;
+
+{ === Word movement tests === }
+
+procedure Test_WordMoveRight;
+var E: TInputEditor;
+    P: TPosition;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('h'));
+    E.InsertChar(Ord('i'));
+    E.InsertChar(Ord(' '));
+    E.InsertChar(Ord('y'));
+    E.InsertChar(Ord('o'));
+    E.MoveHome;
+    E.MoveWordRight;
+    P := E.CursorScreenPos(TRect.Make(0, 0, 20, 1));
+    AssertEqInt(3, P.X, 'past first word + space');
+    E.MoveWordRight;
+    P := E.CursorScreenPos(TRect.Make(0, 0, 20, 1));
+    AssertEqInt(5, P.X, 'end of second word');
+  finally E.Free; end;
+end;
+
+procedure Test_WordMoveLeft;
+var E: TInputEditor;
+    P: TPosition;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('h'));
+    E.InsertChar(Ord('i'));
+    E.InsertChar(Ord(' '));
+    E.InsertChar(Ord('y'));
+    E.InsertChar(Ord('o'));
+    E.MoveWordLeft;
+    P := E.CursorScreenPos(TRect.Make(0, 0, 20, 1));
+    AssertEqInt(3, P.X, 'back to start of yo');
+    E.MoveWordLeft;
+    P := E.CursorScreenPos(TRect.Make(0, 0, 20, 1));
+    AssertEqInt(0, P.X, 'back to start');
+  finally E.Free; end;
+end;
+
+{ === Delete line test === }
+
+procedure Test_DeleteLine;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertNewline;
+    E.InsertChar(Ord('b'));
+    E.InsertNewline;
+    E.InsertChar(Ord('c'));
+    E.MoveUp;
+    E.DeleteLine;
+    AssertEqStr('a' + #10 + 'c', E.Content, 'middle line deleted');
+    AssertEqInt(2, E.LineCount, '2 lines remain');
+  finally E.Free; end;
+end;
+
+{ === Ctrl shortcuts via HandleKey === }
+
+procedure Test_HandleKeyCtrlC;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('x'));
+    E.InsertChar(Ord('y'));
+    E.SelectAll;
+    E.HandleKey(KeyCharEvent(Ord('c'), [kmCtrl]).Key);
+    E.MoveEnd;
+    E.HandleKey(KeyCharEvent(Ord('v'), [kmCtrl]).Key);
+    AssertEqStr('xyxy', E.Content, 'ctrl+c then ctrl+v');
+  finally E.Free; end;
+end;
+
+procedure Test_HandleKeyCtrlZ;
+var E: TInputEditor;
+begin
+  E := TInputEditor.Create;
+  try
+    E.InsertChar(Ord('a'));
+    E.InsertChar(Ord('b'));
+    E.HandleKey(KeyCharEvent(Ord('z'), [kmCtrl]).Key);
+    AssertEqStr('a', E.Content, 'ctrl+z undoes');
+    E.HandleKey(KeyCharEvent(Ord('y'), [kmCtrl]).Key);
+    AssertEqStr('ab', E.Content, 'ctrl+y redoes');
+  finally E.Free; end;
+end;
+
 procedure RegisterInputEditorTests;
 begin
   RegisterTest('input_editor / empty on create',         @Test_EmptyOnCreate);
@@ -292,6 +490,18 @@ begin
   RegisterTest('input_editor / HandleKey shift+enter',   @Test_HandleKeyShiftEnter);
   RegisterTest('input_editor / render shows content',    @Test_RenderShowsContent);
   RegisterTest('input_editor / render shows placeholder',@Test_RenderShowsPlaceholder);
+  RegisterTest('input_editor / selection shift+right',   @Test_SelectionShiftRight);
+  RegisterTest('input_editor / selection shift+left',    @Test_SelectionShiftLeft);
+  RegisterTest('input_editor / select all',              @Test_SelectAll);
+  RegisterTest('input_editor / type replaces selection', @Test_TypeReplacesSelection);
+  RegisterTest('input_editor / undo basic',              @Test_UndoBasic);
+  RegisterTest('input_editor / redo basic',              @Test_RedoBasic);
+  RegisterTest('input_editor / undo after new edit',     @Test_UndoAfterNewEdit);
+  RegisterTest('input_editor / word move right',         @Test_WordMoveRight);
+  RegisterTest('input_editor / word move left',          @Test_WordMoveLeft);
+  RegisterTest('input_editor / delete line',             @Test_DeleteLine);
+  RegisterTest('input_editor / HandleKey ctrl+c/v',      @Test_HandleKeyCtrlC);
+  RegisterTest('input_editor / HandleKey ctrl+z/y',      @Test_HandleKeyCtrlZ);
 end;
 
 end.
