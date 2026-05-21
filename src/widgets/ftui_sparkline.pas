@@ -158,6 +158,7 @@ begin
     ActualMax := 1.0;
 
   // Allocate grid of braille bit patterns (one byte per cell)
+  // TODO(perf): Grid 每帧堆分配。若成为瓶颈，用 frame-local arena 统一解决。
   SetLength(Grid, CellW, CellH);
   for Col := 0 to CellW - 1 do
     for Row := 0 to CellH - 1 do

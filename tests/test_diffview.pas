@@ -3,7 +3,7 @@ unit test_diffview;
 interface
 procedure RegisterDiffViewTests;
 implementation
-uses ftui_testkit, ftui_rect, ftui_style, ftui_buffer, ftui_diffview;
+uses ftui_testkit, SysUtils, ftui_rect, ftui_style, ftui_buffer, ftui_diffview;
 
 procedure Test_FromUnifiedDiff;
 var DV: TDiffView;
@@ -64,11 +64,82 @@ begin
   AssertEqInt(0, S.ScrollY, 'clamped');
 end;
 
+procedure Test_EmptyDiff;
+var DV: TDiffView; Buf: TBuffer; State: TDiffViewState;
+begin
+  DV := TDiffView.FromUnifiedDiff('');
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 40, 5));
+  State := TDiffViewState.Empty;
+  DV.RenderStateful(TRect.Make(0, 0, 40, 5), Buf, State);
+  AssertTrue(True, 'empty diff: no crash');
+  Buf.Free;
+end;
+
+procedure Test_EmptyAreaNoCrash;
+var DV: TDiffView; Buf: TBuffer; State: TDiffViewState;
+begin
+  DV := TDiffView.FromUnifiedDiff('@@ -1 +1 @@' + #10 + '+x');
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 0, 0));
+  State := TDiffViewState.Empty;
+  DV.RenderStateful(TRect.Make(0, 0, 0, 0), Buf, State);
+  AssertTrue(True, 'empty area: no crash');
+  Buf.Free;
+end;
+
+procedure Test_ScrollClampToContent;
+var S: TDiffViewState; DV: TDiffView; Buf: TBuffer;
+begin
+  DV := TDiffView.FromUnifiedDiff('@@ -1 +1 @@' + #10 + '+a' + #10 + '+b');
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 40, 10));
+  S := TDiffViewState.Empty;
+  S.ScrollDown(100);
+  DV.RenderStateful(TRect.Make(0, 0, 40, 10), Buf, S);
+  AssertEqInt(0, S.ScrollY, 'scroll clamped: content fits in view');
+  Buf.Free;
+end;
+
+procedure Test_LongLinesTruncated;
+var DV: TDiffView; Buf: TBuffer; State: TDiffViewState; Row: AnsiString;
+begin
+  DV := TDiffView.FromUnifiedDiff(
+    '@@ -1 +1 @@' + #10 +
+    '+' + StringOfChar('X', 200)
+  );
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 20, 3));
+  State := TDiffViewState.Empty;
+  DV.RenderStateful(TRect.Make(0, 0, 20, 3), Buf, State);
+  Row := Buf.RowAsString(1);
+  AssertTrue(Length(Row) <= 20, 'long line truncated to area width');
+  Buf.Free;
+end;
+
+procedure Test_LineNumbers;
+var DV: TDiffView; Buf: TBuffer; State: TDiffViewState; Row: AnsiString;
+begin
+  DV := TDiffView.FromUnifiedDiff(
+    '@@ -1,2 +1,2 @@' + #10 +
+    ' context' + #10 +
+    '-old' + #10 +
+    '+new'
+  );
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 40, 5));
+  State := TDiffViewState.Empty;
+  DV.RenderStateful(TRect.Make(0, 0, 40, 5), Buf, State);
+  Row := Buf.RowAsString(1);
+  AssertTrue(Pos('1', Row) > 0, 'line number visible');
+  Buf.Free;
+end;
+
 procedure RegisterDiffViewTests;
 begin
   RegisterTest('diffview / from unified diff', @Test_FromUnifiedDiff);
   RegisterTest('diffview / line kinds',        @Test_LineKinds);
   RegisterTest('diffview / render shows diff', @Test_RenderShowsDiff);
   RegisterTest('diffview / scroll state',      @Test_ScrollState);
+  RegisterTest('diffview / empty diff',        @Test_EmptyDiff);
+  RegisterTest('diffview / empty area',        @Test_EmptyAreaNoCrash);
+  RegisterTest('diffview / scroll clamp',      @Test_ScrollClampToContent);
+  RegisterTest('diffview / long lines truncated', @Test_LongLinesTruncated);
+  RegisterTest('diffview / line numbers',      @Test_LineNumbers);
 end;
 end.
