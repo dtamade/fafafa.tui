@@ -51,9 +51,6 @@ type
 
 implementation
 
-uses
-  SysUtils;
-
 { TVirtualListState }
 
 class function TVirtualListState.Create(ATotal: Integer): TVirtualListState;
@@ -125,8 +122,11 @@ procedure TVirtualList.RenderStateful(const Area: TRect; ABuf: TBuffer; var Stat
 var
   Inner: TRect;
   ViewH, I, Row, GutterW, TextX, TextW: Integer;
-  ItemText, IdxStr: AnsiString;
+  ItemText: AnsiString;
   LineSty: TStyle;
+  IdxBuf: array[0..11] of Byte;
+  IdxLen, J, V, D: Integer;
+  IdxStr: AnsiString;
 begin
   if Area.IsEmpty then Exit;
 
@@ -151,11 +151,14 @@ begin
     State.Offset := State.Selected - ViewH + 1;
   if State.Offset < 0 then State.Offset := 0;
 
-  // Gutter for index
+  // Gutter for index — compute digit count without IntToStr
   GutterW := 0;
   if ShowIndex then
   begin
-    GutterW := Length(IntToStr(State.TotalItems)) + 1;
+    V := State.TotalItems;
+    GutterW := 1;
+    while V >= 10 do begin Inc(GutterW); V := V div 10; end;
+    Inc(GutterW); // trailing space
     if GutterW < 4 then GutterW := 4;
   end;
 
@@ -173,13 +176,25 @@ begin
     else
       LineSty := Style;
 
-    // Index gutter
+    // Index gutter — itoa without heap allocation
     if ShowIndex then
     begin
-      IdxStr := IntToStr(Row + 1);
-      while Length(IdxStr) < GutterW - 1 do
-        IdxStr := ' ' + IdxStr;
-      IdxStr := IdxStr + ' ';
+      V := Row + 1;
+      IdxLen := 0;
+      repeat
+        IdxBuf[IdxLen] := Byte(Ord('0') + (V mod 10));
+        V := V div 10;
+        Inc(IdxLen);
+      until V = 0;
+      // Right-align into IdxStr (reuse pre-allocated length)
+      SetLength(IdxStr, GutterW);
+      for J := 1 to GutterW do IdxStr[J] := ' ';
+      D := GutterW - 1; // last char before trailing space
+      for J := 0 to IdxLen - 1 do
+      begin
+        IdxStr[D] := Chr(IdxBuf[J]);
+        Dec(D);
+      end;
       ABuf.SetStringN(Inner.X, Inner.Y + I, IdxStr, GutterW, Style);
     end;
 

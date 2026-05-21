@@ -91,5 +91,11 @@ quickstart:
 	@mkdir -p $(NAME)
 	@cp templates/quickstart.lpr $(NAME)/$(NAME).lpr
 	@sed -i "s/quickstart/$(NAME)/g" $(NAME)/$(NAME).lpr
-	@echo "Created $(NAME)/$(NAME).lpr"
-	@echo "Build: fpc -Fusrc/core -Fusrc/terminal -Fusrc/input -Fusrc/backend -Fusrc/layout -Fusrc/widgets -Fusrc/text $(NAME)/$(NAME).lpr"
+	@cp templates/quickstart_makefile $(NAME)/Makefile
+	@sed -i "s|__FTUI_ROOT__|$(TUI_ROOT)|g" $(NAME)/Makefile
+	@sed -i "s|__APP_NAME__|$(NAME)|g" $(NAME)/Makefile
+	@echo "Created $(NAME)/"
+	@echo "  $(NAME).lpr  — your app"
+	@echo "  Makefile     — build system (make run)"
+	@echo ""
+	@echo "Next: cd $(NAME) && make run"

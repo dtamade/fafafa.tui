@@ -112,6 +112,10 @@ begin
   C.Modifier := (C.Modifier + S.AddMod) - S.SubMod;
 end;
 
+{$if SizeOf(TCell) <> 40}
+  {$error TCell size changed from 40 bytes — update CellEquals and Buffer.Diff QWord comparisons}
+{$endif}
+
 function CellEquals(const A, B: TCell): Boolean;
 var
   PA, PB: PQWord;

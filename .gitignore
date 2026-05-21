@@ -1,4 +1,5 @@
 build/
+lib/
 *.o
 *.ppu
 *.compiled
@@ -8,3 +9,4 @@ build/
 *.bak
 link*.res
 ppas.sh
+fafafa_tui.cfg

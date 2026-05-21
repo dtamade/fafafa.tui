@@ -171,6 +171,15 @@ begin
 
   if Inner.IsEmpty then Exit;
 
+  // Clamp state indices
+  if Length(State.Nodes) > 0 then
+  begin
+    if State.Selected < 0 then State.Selected := 0;
+    if State.Selected >= Length(State.Nodes) then State.Selected := Length(State.Nodes) - 1;
+  end
+  else
+    State.Selected := 0;
+
   ViewH := Inner.Height;
 
   // Ensure selected visible

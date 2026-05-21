@@ -158,6 +158,18 @@ var
 begin
   if Area.IsEmpty or (Length(Columns) = 0) then Exit;
 
+  // Clamp state indices
+  if State.ActiveCol < 0 then State.ActiveCol := 0;
+  if State.ActiveCol >= Length(Columns) then State.ActiveCol := Length(Columns) - 1;
+  if Length(Columns[State.ActiveCol].Cards) > 0 then
+  begin
+    if State.ActiveCard < 0 then State.ActiveCard := 0;
+    if State.ActiveCard >= Length(Columns[State.ActiveCol].Cards) then
+      State.ActiveCard := Length(Columns[State.ActiveCol].Cards) - 1;
+  end
+  else
+    State.ActiveCard := 0;
+
   ABuf.SetStyle(Area, Style);
 
   if HasBlock then

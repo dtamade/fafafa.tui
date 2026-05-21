@@ -80,21 +80,26 @@ end;
 function ParseMarkdownLines(const Source: AnsiString): TMdLineArray;
 var
   Lines: TMdLineArray;
-  Count, I, Start, Len: Integer;
+  Count, Cap, I, Start, Len: Integer;
   RawLine, Trimmed: AnsiString;
   InCodeBlock: Boolean;
 
   procedure AddLine(AKind: TMdLineKind; const AText: AnsiString; AIndent: Integer = 0);
   begin
+    if Count = Cap then
+    begin
+      if Cap = 0 then Cap := 32 else Cap := Cap * 2;
+      SetLength(Lines, Cap);
+    end;
+    Lines[Count].Kind := AKind;
+    Lines[Count].Text := AText;
+    Lines[Count].Indent := AIndent;
     Inc(Count);
-    SetLength(Lines, Count);
-    Lines[Count - 1].Kind := AKind;
-    Lines[Count - 1].Text := AText;
-    Lines[Count - 1].Indent := AIndent;
   end;
 
 begin
   Count := 0;
+  Cap := 0;
   Lines := nil;
   InCodeBlock := False;
   Len := Length(Source);
@@ -143,6 +148,7 @@ begin
     end;
   end;
 
+  SetLength(Lines, Count);
   Result := Lines;
 end;
 

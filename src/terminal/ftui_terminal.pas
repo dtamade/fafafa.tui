@@ -136,9 +136,10 @@ uses
 // SIGWINCH flag.  Module-global because the signal handler needs C
 // linkage and can't capture context.  Single TTerminal at a time is
 // the assumed contract — fafafa.tui is process-scoped.
+// Use LongInt + InterlockedExchange for async-signal-safe volatile semantics.
 var
-  GResizePending: Boolean = False;
-  GTermPending: Boolean = False;
+  GResizePending: LongInt = 0;
+  GTermPending: LongInt = 0;
   GSigwinchHooked: Boolean = False;
   GSigtermHooked: Boolean = False;
   GSavedSigwinch: SigActionRec;
@@ -146,12 +147,12 @@ var
 
 procedure FtuiSigwinchHandler(Sig: cint); cdecl;
 begin
-  GResizePending := True;
+  InterlockedExchange(GResizePending, 1);
 end;
 
 procedure FtuiSigtermHandler(Sig: cint); cdecl;
 begin
-  GTermPending := True;
+  InterlockedExchange(GTermPending, 1);
 end;
 
 procedure HookSigwinch;
@@ -303,9 +304,10 @@ var
   Tmp: TBuffer;
 begin
   // Copy base buffer into merged, then apply overlay on top.
-  FMerged.Reset;
-  if FCurr.Length_ > 0 then
-    Move(FCurr.ContentPtr^, FMerged.ContentPtr^, FCurr.Length_ * SizeOf(TCell));
+  if (FCurr.Length_ > 0) and (FMerged.Length_ > 0) then
+    Move(FCurr.ContentPtr^, FMerged.ContentPtr^, FCurr.Length_ * SizeOf(TCell))
+  else
+    FMerged.Reset;
   FOverlay.MergeInto(FCurr, FMerged);
   PatchCount := FPrev.DiffInto(FMerged, FPatches);
   FBackend.DrawPatchesN(FPatches, PatchCount);
@@ -366,13 +368,9 @@ var
   Sz: TTermSize;
 begin
   HasResize := False;
-  if GTermPending then
-  begin
-    GTermPending := False;
+  if InterlockedExchange(GTermPending, 0) <> 0 then
     RequestQuit;
-  end;
-  if not GResizePending then Exit;
-  GResizePending := False;
+  if InterlockedExchange(GResizePending, 0) = 0 then Exit;
   if not GetTerminalSize(STDOUT_FD, Sz) then Exit;
   ResizeBuffersTo(Sz.Cols, Sz.Rows);
   ResizeOut := ResizeEvent(Sz.Cols, Sz.Rows);

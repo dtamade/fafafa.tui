@@ -70,6 +70,11 @@ begin
   begin
     B := ByteAt(Buf, Pos);
     if (B < Ord('0')) or (B > Ord('9')) then Break;
+    if Value > 100000 then
+    begin
+      Inc(Pos);
+      Continue;
+    end;
     Value := Value * 10 + Integer(B - Ord('0'));
     Inc(Pos);
     Result := True;

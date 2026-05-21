@@ -171,8 +171,11 @@ begin
       end;
     end;
   finally
-    OnDestroy;
-    DoLeaveTui;
+    try
+      OnDestroy;
+    finally
+      DoLeaveTui;
+    end;
   end;
 end;
 

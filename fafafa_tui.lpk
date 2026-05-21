@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="fafafa_tui"/>
+    <Type Value="RunAndDesignTime"/>
+    <Author Value="fafafa.tui contributors"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <OtherUnitFiles Value="src/core;src/text;src/layout;src/widgets;src/backend;src/terminal;src/input"/>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+      <Parsing>
+        <SyntaxOptions>
+          <SyntaxMode Value="ObjFPC"/>
+        </SyntaxOptions>
+      </Parsing>
+    </CompilerOptions>
+    <Description Value="FreePascal TUI framework — immediate mode, double-buffer diff rendering, 43 widgets."/>
+    <License Value="MIT"/>
+    <Version Major="1" Minor="0" Release="0"/>
+    <Files>
+      <Item>
+        <Filename Value="src/backend/ftui_ansi_backend.pas"/>
+        <UnitName Value="ftui_ansi_backend"/>
+      </Item>
+      <Item>
+        <Filename Value="src/backend/ftui_ansi.pas"/>
+        <UnitName Value="ftui_ansi"/>
+      </Item>
+      <Item>
+        <Filename Value="src/backend/ftui_bytes.pas"/>
+        <UnitName Value="ftui_bytes"/>
+      </Item>
+      <Item>
+        <Filename Value="src/backend/ftui_test_backend.pas"/>
+        <UnitName Value="ftui_test_backend"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_anim.pas"/>
+        <UnitName Value="ftui_anim"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_app.pas"/>
+        <UnitName Value="ftui_app"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_buffer.pas"/>
+        <UnitName Value="ftui_buffer"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_cell.pas"/>
+        <UnitName Value="ftui_cell"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_color_cap.pas"/>
+        <UnitName Value="ftui_color_cap"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_color.pas"/>
+        <UnitName Value="ftui_color"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_focus.pas"/>
+        <UnitName Value="ftui_focus"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_grapheme.pas"/>
+        <UnitName Value="ftui_grapheme"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_keybind.pas"/>
+        <UnitName Value="ftui_keybind"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_modifier.pas"/>
+        <UnitName Value="ftui_modifier"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_overlay.pas"/>
+        <UnitName Value="ftui_overlay"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_rect.pas"/>
+        <UnitName Value="ftui_rect"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_screen.pas"/>
+        <UnitName Value="ftui_screen"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_style.pas"/>
+        <UnitName Value="ftui_style"/>
+      </Item>
+      <Item>
+        <Filename Value="src/core/ftui_theme.pas"/>
+        <UnitName Value="ftui_theme"/>
+      </Item>
+      <Item>
+        <Filename Value="src/input/ftui_event.pas"/>
+        <UnitName Value="ftui_event"/>
+      </Item>
+      <Item>
+        <Filename Value="src/input/ftui_input_parser.pas"/>
+        <UnitName Value="ftui_input_parser"/>
+      </Item>
+      <Item>
+        <Filename Value="src/layout/ftui_grid.pas"/>
+        <UnitName Value="ftui_grid"/>
+      </Item>
+      <Item>
+        <Filename Value="src/layout/ftui_layout_dsl.pas"/>
+        <UnitName Value="ftui_layout_dsl"/>
+      </Item>
+      <Item>
+        <Filename Value="src/layout/ftui_layout.pas"/>
+        <UnitName Value="ftui_layout"/>
+      </Item>
+      <Item>
+        <Filename Value="src/terminal/ftui_clipboard.pas"/>
+        <UnitName Value="ftui_clipboard"/>
+      </Item>
+      <Item>
+        <Filename Value="src/terminal/ftui_event_loop.pas"/>
+        <UnitName Value="ftui_event_loop"/>
+      </Item>
+      <Item>
+        <Filename Value="src/terminal/ftui_frame_budget.pas"/>
+        <UnitName Value="ftui_frame_budget"/>
+      </Item>
+      <Item>
+        <Filename Value="src/terminal/ftui_terminal.pas"/>
+        <UnitName Value="ftui_terminal"/>
+      </Item>
+      <Item>
+        <Filename Value="src/terminal/ftui_termios.pas"/>
+        <UnitName Value="ftui_termios"/>
+      </Item>
+      <Item>
+        <Filename Value="src/text/ftui_format.pas"/>
+        <UnitName Value="ftui_format"/>
+      </Item>
+      <Item>
+        <Filename Value="src/text/ftui_text.pas"/>
+        <UnitName Value="ftui_text"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_barchart.pas"/>
+        <UnitName Value="ftui_barchart"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_block.pas"/>
+        <UnitName Value="ftui_block"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_borders.pas"/>
+        <UnitName Value="ftui_borders"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_breadcrumb.pas"/>
+        <UnitName Value="ftui_breadcrumb"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_calendar.pas"/>
+        <UnitName Value="ftui_calendar"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_canvas.pas"/>
+        <UnitName Value="ftui_canvas"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_clear.pas"/>
+        <UnitName Value="ftui_clear"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_command_palette.pas"/>
+        <UnitName Value="ftui_command_palette"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_dialog.pas"/>
+        <UnitName Value="ftui_dialog"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_diffview.pas"/>
+        <UnitName Value="ftui_diffview"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_file_tree.pas"/>
+        <UnitName Value="ftui_file_tree"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_form.pas"/>
+        <UnitName Value="ftui_form"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_gauge.pas"/>
+        <UnitName Value="ftui_gauge"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_image.pas"/>
+        <UnitName Value="ftui_image"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_input_editor.pas"/>
+        <UnitName Value="ftui_input_editor"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_input.pas"/>
+        <UnitName Value="ftui_input"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_interaction.pas"/>
+        <UnitName Value="ftui_interaction"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_kanban.pas"/>
+        <UnitName Value="ftui_kanban"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_linechart.pas"/>
+        <UnitName Value="ftui_linechart"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_list.pas"/>
+        <UnitName Value="ftui_list"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_markdown.pas"/>
+        <UnitName Value="ftui_markdown"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_menu.pas"/>
+        <UnitName Value="ftui_menu"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_modal.pas"/>
+        <UnitName Value="ftui_modal"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_notification_center.pas"/>
+        <UnitName Value="ftui_notification_center"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_paragraph.pas"/>
+        <UnitName Value="ftui_paragraph"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_popover.pas"/>
+        <UnitName Value="ftui_popover"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_progress_group.pas"/>
+        <UnitName Value="ftui_progress_group"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_scrollbar.pas"/>
+        <UnitName Value="ftui_scrollbar"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_scrollview.pas"/>
+        <UnitName Value="ftui_scrollview"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_select.pas"/>
+        <UnitName Value="ftui_select"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_sparkline.pas"/>
+        <UnitName Value="ftui_sparkline"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_split_pane.pas"/>
+        <UnitName Value="ftui_split_pane"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_statusbar.pas"/>
+        <UnitName Value="ftui_statusbar"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_syntax.pas"/>
+        <UnitName Value="ftui_syntax"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_table.pas"/>
+        <UnitName Value="ftui_table"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_tabs.pas"/>
+        <UnitName Value="ftui_tabs"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_textarea.pas"/>
+        <UnitName Value="ftui_textarea"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_theme.pas"/>
+        <UnitName Value="ftui_theme"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_timeline.pas"/>
+        <UnitName Value="ftui_timeline"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_toast.pas"/>
+        <UnitName Value="ftui_toast"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_tooltip.pas"/>
+        <UnitName Value="ftui_tooltip"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_tree.pas"/>
+        <UnitName Value="ftui_tree"/>
+      </Item>
+      <Item>
+        <Filename Value="src/widgets/ftui_virtual_list.pas"/>
+        <UnitName Value="ftui_virtual_list"/>
+      </Item>
+    </Files>
+    <RequiredPkgs>
+      <Item>
+        <PackageName Value="FCL"/>
+      </Item>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+  </Package>
+</CONFIG>
