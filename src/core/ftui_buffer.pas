@@ -268,10 +268,15 @@ end;
 procedure TBuffer.Reset;
 var
   I, Total: Integer;
+  Dirty: TCell;
 begin
   Total := System.Length(FContent);
   if Total = 0 then Exit;
-  FContent[0] := CellEmpty;
+  // Use a cell that differs from CellEmpty so Diff always produces patches
+  // after a reset (e.g. after terminal resize).
+  Dirty := CellEmpty;
+  Dirty.Glyph.Len := 0;  // impossible in normal rendering → guarantees diff
+  FContent[0] := Dirty;
   I := 1;
   while I + I <= Total do
   begin

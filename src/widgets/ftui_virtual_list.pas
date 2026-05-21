@@ -1,0 +1,196 @@
+unit ftui_virtual_list;
+
+{$mode objfpc}{$H+}{$inline on}
+{$modeswitch advancedrecords}
+{$packenum 1}
+{$packset 2}
+
+interface
+
+uses
+  ftui_rect,
+  ftui_color,
+  ftui_modifier,
+  ftui_style,
+  ftui_cell,
+  ftui_buffer,
+  ftui_block;
+
+type
+  TItemProviderFunc = function(Index: Integer): AnsiString;
+
+  TVirtualListState = record
+    TotalItems: Integer;
+    Offset: Integer;
+    Selected: Integer;
+
+    class function Create(ATotal: Integer): TVirtualListState; static;
+    procedure SelectNext;
+    procedure SelectPrev;
+    procedure PageDown(ViewH: Integer);
+    procedure PageUp(ViewH: Integer);
+    procedure SelectFirst;
+    procedure SelectLast;
+  end;
+
+  TVirtualList = record
+    ItemProvider: TItemProviderFunc;
+    Style: TStyle;
+    SelectedStyle: TStyle;
+    HasBlock: Boolean;
+    Block: TBlock;
+    ShowIndex: Boolean;
+
+    class function Create(Provider: TItemProviderFunc): TVirtualList; static;
+    function WithStyle(const S: TStyle): TVirtualList;
+    function WithSelectedStyle(const S: TStyle): TVirtualList;
+    function WithBlock(const B: TBlock): TVirtualList;
+    function WithShowIndex(V: Boolean): TVirtualList;
+    procedure RenderStateful(const Area: TRect; ABuf: TBuffer; var State: TVirtualListState);
+  end;
+
+implementation
+
+uses
+  SysUtils;
+
+{ TVirtualListState }
+
+class function TVirtualListState.Create(ATotal: Integer): TVirtualListState;
+begin
+  Result.TotalItems := ATotal;
+  Result.Offset := 0;
+  Result.Selected := 0;
+end;
+
+procedure TVirtualListState.SelectNext;
+begin
+  if Selected < TotalItems - 1 then Inc(Selected);
+end;
+
+procedure TVirtualListState.SelectPrev;
+begin
+  if Selected > 0 then Dec(Selected);
+end;
+
+procedure TVirtualListState.PageDown(ViewH: Integer);
+begin
+  Inc(Selected, ViewH);
+  if Selected >= TotalItems then Selected := TotalItems - 1;
+  if Selected < 0 then Selected := 0;
+end;
+
+procedure TVirtualListState.PageUp(ViewH: Integer);
+begin
+  Dec(Selected, ViewH);
+  if Selected < 0 then Selected := 0;
+end;
+
+procedure TVirtualListState.SelectFirst;
+begin
+  Selected := 0;
+end;
+
+procedure TVirtualListState.SelectLast;
+begin
+  Selected := TotalItems - 1;
+  if Selected < 0 then Selected := 0;
+end;
+
+{ TVirtualList }
+
+class function TVirtualList.Create(Provider: TItemProviderFunc): TVirtualList;
+begin
+  Result.ItemProvider := Provider;
+  Result.Style := TStyle.Default;
+  Result.SelectedStyle := TStyle.Default.WithModifier([mbReversed]);
+  Result.HasBlock := False;
+  Result.Block := TBlock.Default;
+  Result.ShowIndex := False;
+end;
+
+function TVirtualList.WithStyle(const S: TStyle): TVirtualList;
+begin Result := Self; Result.Style := S; end;
+
+function TVirtualList.WithSelectedStyle(const S: TStyle): TVirtualList;
+begin Result := Self; Result.SelectedStyle := S; end;
+
+function TVirtualList.WithBlock(const B: TBlock): TVirtualList;
+begin Result := Self; Result.HasBlock := True; Result.Block := B; end;
+
+function TVirtualList.WithShowIndex(V: Boolean): TVirtualList;
+begin Result := Self; Result.ShowIndex := V; end;
+
+procedure TVirtualList.RenderStateful(const Area: TRect; ABuf: TBuffer; var State: TVirtualListState);
+var
+  Inner: TRect;
+  ViewH, I, Row, GutterW, TextX, TextW: Integer;
+  ItemText, IdxStr: AnsiString;
+  LineSty: TStyle;
+begin
+  if Area.IsEmpty then Exit;
+
+  ABuf.SetStyle(Area, Style);
+
+  if HasBlock then
+  begin
+    Block.Render(Area, ABuf);
+    Inner := Block.Inner(Area);
+  end
+  else
+    Inner := Area;
+
+  if Inner.IsEmpty then Exit;
+
+  ViewH := Inner.Height;
+
+  // Ensure selected is visible
+  if State.Selected < State.Offset then
+    State.Offset := State.Selected;
+  if State.Selected >= State.Offset + ViewH then
+    State.Offset := State.Selected - ViewH + 1;
+  if State.Offset < 0 then State.Offset := 0;
+
+  // Gutter for index
+  GutterW := 0;
+  if ShowIndex then
+  begin
+    GutterW := Length(IntToStr(State.TotalItems)) + 1;
+    if GutterW < 4 then GutterW := 4;
+  end;
+
+  TextX := Inner.X + GutterW;
+  TextW := Inner.Width - GutterW;
+  if TextW < 1 then TextW := 1;
+
+  for I := 0 to ViewH - 1 do
+  begin
+    Row := State.Offset + I;
+    if Row >= State.TotalItems then Break;
+
+    if Row = State.Selected then
+      LineSty := SelectedStyle
+    else
+      LineSty := Style;
+
+    // Index gutter
+    if ShowIndex then
+    begin
+      IdxStr := IntToStr(Row + 1);
+      while Length(IdxStr) < GutterW - 1 do
+        IdxStr := ' ' + IdxStr;
+      IdxStr := IdxStr + ' ';
+      ABuf.SetStringN(Inner.X, Inner.Y + I, IdxStr, GutterW, Style);
+    end;
+
+    // Item content via provider
+    if Assigned(ItemProvider) then
+      ItemText := ItemProvider(Row)
+    else
+      ItemText := '';
+
+    ABuf.SetStringN(TextX, Inner.Y + I, ItemText, TextW, LineSty);
+  end;
+end;
+
+end.

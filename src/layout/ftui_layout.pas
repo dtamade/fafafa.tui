@@ -41,11 +41,12 @@ uses
   ftui_rect;
 
 type
-  TConstraintKind = (ckLength, ckMin, ckPercentage);
+  TConstraintKind = (ckLength, ckMin, ckMax, ckPercentage, ckFill);
 
   TConstraint = packed record
     Kind: TConstraintKind;
     Value: Word;
+    Value2: Word;   // ckFill: weight; unused for others
   end;
 
   TDirection = (dirHorizontal, dirVertical);
@@ -69,7 +70,9 @@ type
 
 function LengthConstraint(N: Word): TConstraint; inline;
 function MinConstraint(N: Word): TConstraint; inline;
+function MaxConstraint(N: Word): TConstraint; inline;
 function PercentageConstraint(N: Word): TConstraint; inline;
+function FillConstraint(Weight: Word): TConstraint; inline;
 
 // Stand-alone helpers for callers who don't want to build a TLayout
 // just to slice a rect.
@@ -82,18 +85,36 @@ function LengthConstraint(N: Word): TConstraint;
 begin
   Result.Kind := ckLength;
   Result.Value := N;
+  Result.Value2 := 0;
 end;
 
 function MinConstraint(N: Word): TConstraint;
 begin
   Result.Kind := ckMin;
   Result.Value := N;
+  Result.Value2 := 0;
+end;
+
+function MaxConstraint(N: Word): TConstraint;
+begin
+  Result.Kind := ckMax;
+  Result.Value := N;
+  Result.Value2 := 0;
 end;
 
 function PercentageConstraint(N: Word): TConstraint;
 begin
   Result.Kind := ckPercentage;
   Result.Value := N;
+  Result.Value2 := 0;
+end;
+
+function FillConstraint(Weight: Word): TConstraint;
+begin
+  Result.Kind := ckFill;
+  Result.Value := 0;
+  Result.Value2 := Weight;
+  if Weight = 0 then Result.Value2 := 1;
 end;
 
 { TLayout }
@@ -142,6 +163,7 @@ function ComputeSlotSizes(Total: Integer;
 var
   N, I, Want, Take, MinCount, Remaining: Integer;
   LastFlexIdx: Integer;
+  FillTotal, FillWeight: Integer;
 begin
   N := System.Length(Cs);
   SetLength(Result, N);
@@ -164,20 +186,24 @@ begin
   for I := 0 to N - 1 do
     if Cs[I].Kind = ckPercentage then
     begin
-      // round-half-to-even is overkill for terminal cells; floor is fine
-      // and matches ratatui's f64 -> u16 truncation in practice.
       Want := (Total * Cs[I].Value) div 100;
       if Want > Remaining then Want := Remaining;
       Result[I] := Want;
       Dec(Remaining, Want);
     end;
 
-  // Pass 3 — distribute Remaining over Min slots.  Each Min slot
-  // takes max(per_slot_share, Min.Value), where per_slot_share is
-  // recomputed at every step against the *current* remaining and the
-  // count of Min slots still to process.  This way a high-floor Min
-  // (e.g. Min(20) when fair share would be 12) can grab its floor and
-  // the next Min slot still gets the right share of the leftover.
+  // Pass 3 — Max: takes up to Value, but no more than fair share.
+  for I := 0 to N - 1 do
+    if Cs[I].Kind = ckMax then
+    begin
+      Want := Remaining;
+      if Want > Integer(Cs[I].Value) then Want := Cs[I].Value;
+      if Want < 0 then Want := 0;
+      Result[I] := Want;
+      Dec(Remaining, Want);
+    end;
+
+  // Pass 4 — Min: distribute remaining over Min slots.
   MinCount := 0;
   for I := 0 to N - 1 do
     if Cs[I].Kind = ckMin then Inc(MinCount);
@@ -191,7 +217,7 @@ begin
         if MinCount > 1 then
           Take := Remaining div MinCount
         else
-          Take := Remaining;        // last Min mops up
+          Take := Remaining;
         if Take < Cs[I].Value then Take := Cs[I].Value;
         if Take > Remaining then Take := Remaining;
         if Take < 0 then Take := 0;
@@ -201,19 +227,52 @@ begin
       end;
   end;
 
-  // Pass 4 — absorb residual (positive or negative) into the LAST
-  // slot, regardless of constraint kind.  This mirrors ratatui's
-  // Legacy flex "trailing slot wins" rule: when residual space
-  // remains after Length/Percentage/Min are honoured, it accumulates
-  // on the right (or bottom) edge.  Since we always have at least
-  // one slot when N > 0, picking N-1 is sound.
+  // Pass 5 — Fill: distribute remaining by weight.
+  FillTotal := 0;
+  for I := 0 to N - 1 do
+    if Cs[I].Kind = ckFill then
+      Inc(FillTotal, Cs[I].Value2);
+
+  if (FillTotal > 0) and (Remaining > 0) then
+  begin
+    for I := 0 to N - 1 do
+      if Cs[I].Kind = ckFill then
+      begin
+        FillWeight := Cs[I].Value2;
+        Take := (Remaining * FillWeight) div FillTotal;
+        Result[I] := Take;
+      end;
+    // Assign residual to last Fill slot
+    Want := 0;
+    for I := 0 to N - 1 do
+      if Cs[I].Kind = ckFill then Inc(Want, Result[I]);
+    if Want < Remaining then
+      for I := N - 1 downto 0 do
+        if Cs[I].Kind = ckFill then
+        begin
+          Inc(Result[I], Remaining - Want);
+          Break;
+        end;
+    Remaining := 0;
+  end;
+
+  // Pass 6 — absorb residual into the last non-Max slot.
   if Remaining <> 0 then
   begin
-    LastFlexIdx := N - 1;
-    if Result[LastFlexIdx] + Remaining < 0 then
-      Result[LastFlexIdx] := 0
-    else
-      Inc(Result[LastFlexIdx], Remaining);
+    LastFlexIdx := -1;
+    for I := N - 1 downto 0 do
+      if Cs[I].Kind <> ckMax then
+      begin
+        LastFlexIdx := I;
+        Break;
+      end;
+    if LastFlexIdx >= 0 then
+    begin
+      if Result[LastFlexIdx] + Remaining < 0 then
+        Result[LastFlexIdx] := 0
+      else
+        Inc(Result[LastFlexIdx], Remaining);
+    end;
   end;
 end;
 

@@ -224,6 +224,30 @@ begin
   end;
 end;
 
+procedure Test_MaxConstraint;
+var R: TRectArray;
+begin
+  R := HorizontalSplit(TRect.Make(0, 0, 100, 1), [MaxConstraint(30), MaxConstraint(30)]);
+  AssertEqInt(30, R[0].Width, 'first max capped at 30');
+  AssertEqInt(30, R[1].Width, 'second max capped at 30');
+end;
+
+procedure Test_FillWeighted;
+var R: TRectArray;
+begin
+  R := HorizontalSplit(TRect.Make(0, 0, 90, 1), [FillConstraint(1), FillConstraint(2)]);
+  AssertEqInt(30, R[0].Width, 'weight 1 gets 30');
+  AssertEqInt(60, R[1].Width, 'weight 2 gets 60');
+end;
+
+procedure Test_FillWithLength;
+var R: TRectArray;
+begin
+  R := HorizontalSplit(TRect.Make(0, 0, 100, 1), [LengthConstraint(20), FillConstraint(1)]);
+  AssertEqInt(20, R[0].Width, 'length takes 20');
+  AssertEqInt(80, R[1].Width, 'fill takes remainder');
+end;
+
 procedure RegisterLayoutTests;
 begin
   RegisterTest('layout / pure lengths',                @Test_PureLengths);
@@ -237,6 +261,9 @@ begin
   RegisterTest('layout / no constraints -> empty',     @Test_NoConstraintsReturnsEmpty);
   RegisterTest('layout / offset area preserves origin',@Test_OffsetAreaPreservesOrigin);
   RegisterTest('layout / TLayout = helper functions',  @Test_TLayoutBuilderEquivalentToHelpers);
+  RegisterTest('layout / max constraint',              @Test_MaxConstraint);
+  RegisterTest('layout / fill weighted',               @Test_FillWeighted);
+  RegisterTest('layout / fill with length',            @Test_FillWithLength);
 end;
 
 end.

@@ -18,6 +18,12 @@ uses
   ftui_event;
 
 type
+  TEditorSnapshot = record
+    Text: AnsiString;
+    CurByte: Integer;
+    Anchor: Integer;
+  end;
+
   TInputEditor = class
   private
     FText: AnsiString;
@@ -26,6 +32,11 @@ type
     FMaxLines: Integer;
     FScrollRow: Integer;
     FAnchor: Integer;         // -1 = no selection
+    FUndoStack: array of TEditorSnapshot;
+    FUndoCount: Integer;
+    FRedoStack: array of TEditorSnapshot;
+    FRedoCount: Integer;
+    FClipboard: AnsiString;
 
     function LineCount_: Integer;
     procedure CursorToRowCol(out Row, Col: Integer);
@@ -103,20 +114,6 @@ implementation
 const
   UNDO_MAX = 100;
 
-type
-  TEditorSnapshot = record
-    Text: AnsiString;
-    CurByte: Integer;
-    Anchor: Integer;
-  end;
-
-var
-  GClipboard: AnsiString = '';
-  GUndoStack: array[0..UNDO_MAX-1] of TEditorSnapshot;
-  GUndoCount: Integer = 0;
-  GRedoStack: array[0..UNDO_MAX-1] of TEditorSnapshot;
-  GRedoCount: Integer = 0;
-
 function Ucs4ToUtf8(Cp: LongWord): AnsiString;
 begin
   if Cp < $80 then begin SetLength(Result, 1); Result[1] := AnsiChar(Cp); end
@@ -136,6 +133,11 @@ begin
   FMaxLines := 4;
   FScrollRow := 0;
   FAnchor := -1;
+  SetLength(FUndoStack, UNDO_MAX);
+  FUndoCount := 0;
+  SetLength(FRedoStack, UNDO_MAX);
+  FRedoCount := 0;
+  FClipboard := '';
 end;
 
 constructor TInputEditor.CreateWithMaxLines(AMax: Integer);
@@ -343,33 +345,33 @@ begin
   Snap.Text := FText;
   Snap.CurByte := FCurByte;
   Snap.Anchor := FAnchor;
-  if GUndoCount < UNDO_MAX then
+  if FUndoCount < UNDO_MAX then
   begin
-    GUndoStack[GUndoCount] := Snap;
-    Inc(GUndoCount);
+    FUndoStack[FUndoCount] := Snap;
+    Inc(FUndoCount);
   end
   else
   begin
-    Move(GUndoStack[1], GUndoStack[0], (UNDO_MAX - 1) * SizeOf(TEditorSnapshot));
-    GUndoStack[UNDO_MAX - 1] := Snap;
+    Move(FUndoStack[1], FUndoStack[0], (UNDO_MAX - 1) * SizeOf(TEditorSnapshot));
+    FUndoStack[UNDO_MAX - 1] := Snap;
   end;
-  GRedoCount := 0;
+  FRedoCount := 0;
 end;
 
 procedure TInputEditor.Undo;
 var Snap, Curr: TEditorSnapshot;
 begin
-  if GUndoCount = 0 then Exit;
+  if FUndoCount = 0 then Exit;
   Curr.Text := FText;
   Curr.CurByte := FCurByte;
   Curr.Anchor := FAnchor;
-  if GRedoCount < UNDO_MAX then
+  if FRedoCount < UNDO_MAX then
   begin
-    GRedoStack[GRedoCount] := Curr;
-    Inc(GRedoCount);
+    FRedoStack[FRedoCount] := Curr;
+    Inc(FRedoCount);
   end;
-  Dec(GUndoCount);
-  Snap := GUndoStack[GUndoCount];
+  Dec(FUndoCount);
+  Snap := FUndoStack[FUndoCount];
   FText := Snap.Text;
   FCurByte := Snap.CurByte;
   FAnchor := Snap.Anchor;
@@ -379,17 +381,17 @@ end;
 procedure TInputEditor.Redo;
 var Snap, Curr: TEditorSnapshot;
 begin
-  if GRedoCount = 0 then Exit;
+  if FRedoCount = 0 then Exit;
   Curr.Text := FText;
   Curr.CurByte := FCurByte;
   Curr.Anchor := FAnchor;
-  if GUndoCount < UNDO_MAX then
+  if FUndoCount < UNDO_MAX then
   begin
-    GUndoStack[GUndoCount] := Curr;
-    Inc(GUndoCount);
+    FUndoStack[FUndoCount] := Curr;
+    Inc(FUndoCount);
   end;
-  Dec(GRedoCount);
-  Snap := GRedoStack[GRedoCount];
+  Dec(FRedoCount);
+  Snap := FRedoStack[FRedoCount];
   FText := Snap.Text;
   FCurByte := Snap.CurByte;
   FAnchor := Snap.Anchor;
@@ -580,13 +582,13 @@ end;
 procedure TInputEditor.CopySelection;
 begin
   if HasSelection then
-    GClipboard := SelectedText;
+    FClipboard := SelectedText;
 end;
 
 procedure TInputEditor.CutSelection;
 begin
   if not HasSelection then Exit;
-  GClipboard := SelectedText;
+  FClipboard := SelectedText;
   PushUndo;
   DeleteSelection;
   FTargetCol := -1;
@@ -596,10 +598,10 @@ procedure TInputEditor.Paste;
 var I, NewLines, CurLines: Integer;
     Clipped: AnsiString;
 begin
-  if GClipboard = '' then Exit;
+  if FClipboard = '' then Exit;
   PushUndo;
   if HasSelection then DeleteSelection;
-  Clipped := GClipboard;
+  Clipped := FClipboard;
   CurLines := LineCount_;
   NewLines := 0;
   for I := 1 to Length(Clipped) do

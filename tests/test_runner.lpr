@@ -34,7 +34,54 @@ uses
   test_overlay,
   test_scrollbar,
   test_terminal_contract,
-  test_cli888_scenarios;
+  test_cli888_scenarios,
+  test_focus,
+  test_color_cap,
+  test_gauge,
+  test_tabs,
+  test_table,
+  test_tree,
+  test_form,
+  test_sparkline,
+  test_canvas,
+  test_dialog,
+  test_frame_budget,
+  test_event_loop,
+  test_clipboard,
+  test_layout_dsl,
+  test_split_pane,
+  test_theme,
+  test_anim,
+  test_menu,
+  test_statusbar,
+  test_toast,
+  test_textarea,
+  test_barchart,
+  test_linechart,
+  test_input,
+  test_scrollview,
+  test_calendar,
+  test_progress_group,
+  test_grid,
+  test_image,
+  test_virtual_list,
+  test_syntax,
+  test_markdown,
+  test_command_palette,
+  test_tooltip,
+  test_file_tree,
+  test_keybind,
+  test_breadcrumb,
+  test_timeline,
+  test_kanban,
+  test_diffview,
+  test_notification_center,
+  test_app,
+  test_screen,
+  test_popover,
+  test_select,
+  test_modal,
+  test_format;
 
 var
   Failed: Integer;
@@ -64,6 +111,53 @@ begin
   RegisterScrollbarTests;
   RegisterTerminalContractTests;
   RegisterCli888ScenarioTests;
+  RegisterFocusTests;
+  RegisterColorCapTests;
+  RegisterGaugeTests;
+  RegisterTabsTests;
+  RegisterTableTests;
+  RegisterTreeTests;
+  RegisterFormTests;
+  RegisterSparklineTests;
+  RegisterCanvasTests;
+  RegisterDialogTests;
+  RegisterFrameBudgetTests;
+  RegisterEventLoopTests;
+  RegisterClipboardTests;
+  RegisterLayoutDslTests;
+  RegisterSplitPaneTests;
+  RegisterThemeTests;
+  RegisterAnimTests;
+  RegisterMenuTests;
+  RegisterStatusBarTests;
+  RegisterToastTests;
+  RegisterTextAreaTests;
+  RegisterBarChartTests;
+  RegisterLineChartTests;
+  RegisterInputTests;
+  RegisterScrollViewTests;
+  RegisterCalendarTests;
+  RegisterProgressGroupTests;
+  RegisterGridTests;
+  RegisterImageTests;
+  RegisterVirtualListTests;
+  RegisterSyntaxTests;
+  RegisterMarkdownTests;
+  RegisterCommandPaletteTests;
+  RegisterTooltipTests;
+  RegisterFileTreeTests;
+  RegisterKeybindTests;
+  RegisterBreadcrumbTests;
+  RegisterTimelineTests;
+  RegisterKanbanTests;
+  RegisterDiffViewTests;
+  RegisterNotificationCenterTests;
+  test_app.RegisterTests;
+  test_screen.RegisterTests;
+  test_popover.RegisterTests;
+  test_select.RegisterTests;
+  test_modal.RegisterTests;
+  RegisterFormatTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

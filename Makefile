@@ -85,3 +85,11 @@ ci: test examples benchmarks acceptance
 
 bench: benchmarks
 	@bash scripts/bench_all.sh
+
+quickstart:
+	@if [ -z "$(NAME)" ]; then echo "Usage: make quickstart NAME=myapp"; exit 1; fi
+	@mkdir -p $(NAME)
+	@cp templates/quickstart.lpr $(NAME)/$(NAME).lpr
+	@sed -i "s/quickstart/$(NAME)/g" $(NAME)/$(NAME).lpr
+	@echo "Created $(NAME)/$(NAME).lpr"
+	@echo "Build: fpc -Fusrc/core -Fusrc/terminal -Fusrc/input -Fusrc/backend -Fusrc/layout -Fusrc/widgets -Fusrc/text $(NAME)/$(NAME).lpr"

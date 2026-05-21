@@ -150,6 +150,7 @@ var
   C: TCell;
   P: PCell;
 begin
+  if TrackArea.IsEmpty then Exit;
   if TrackArea.Width < 1 then Exit;
   TS := ThumbStart(TrackArea.Height);
   TSz := ThumbSize(TrackArea.Height);
