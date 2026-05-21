@@ -81,7 +81,8 @@ uses
   test_popover,
   test_select,
   test_modal,
-  test_format;
+  test_format,
+  test_terminal;
 
 var
   Failed: Integer;
@@ -158,6 +159,7 @@ begin
   test_select.RegisterTests;
   test_modal.RegisterTests;
   RegisterFormatTests;
+  RegisterTerminalTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

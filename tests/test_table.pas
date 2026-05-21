@@ -180,6 +180,103 @@ begin
   Buf.Free;
 end;
 
+procedure Test_EmptyAreaNoCrash;
+var
+  T: TTable;
+  Buf: TBuffer;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 0, 0));
+  T := TTable.Create([
+    TTableColumn.Make('X', LengthConstraint(5))
+  ]).WithRows([TTableRow.Make(['hi'])]);
+  T.Render(TRect.Make(0, 0, 0, 0), Buf);
+  AssertTrue(True, 'empty area: no crash');
+  Buf.Free;
+end;
+
+procedure Test_MoreColumnsThanCells;
+var
+  T: TTable;
+  Buf: TBuffer;
+  Area: TRect;
+  State: TTableState;
+begin
+  Area := TRect.Make(0, 0, 30, 3);
+  Buf := TBuffer.CreateEmpty(Area);
+  T := TTable.Create([
+    TTableColumn.Make('A', LengthConstraint(10)),
+    TTableColumn.Make('B', LengthConstraint(10)),
+    TTableColumn.Make('C', LengthConstraint(10))
+  ]).WithRows([
+    TTableRow.Make(['only_one'])
+  ]);
+  State := TTableState.Empty;
+  T.RenderStateful(Area, Buf, State);
+  AssertTrue(Pos('only_one', Buf.RowAsString(1)) > 0, 'fewer cells than cols: renders ok');
+  Buf.Free;
+end;
+
+procedure Test_SelectionClampToRowCount;
+var
+  T: TTable;
+  Buf: TBuffer;
+  Area: TRect;
+  State: TTableState;
+begin
+  Area := TRect.Make(0, 0, 20, 5);
+  Buf := TBuffer.CreateEmpty(Area);
+  T := TTable.Create([
+    TTableColumn.Make('V', LengthConstraint(20))
+  ]).WithRows([
+    TTableRow.Make(['a']),
+    TTableRow.Make(['b'])
+  ]);
+  State := TTableState.Empty;
+  State.Select(99);
+  T.RenderStateful(Area, Buf, State);
+  AssertEqInt(1, State.Selected, 'selection clamped to last row');
+  Buf.Free;
+end;
+
+procedure Test_NegativeSelectionClamp;
+var
+  T: TTable;
+  Buf: TBuffer;
+  Area: TRect;
+  State: TTableState;
+begin
+  Area := TRect.Make(0, 0, 20, 5);
+  Buf := TBuffer.CreateEmpty(Area);
+  T := TTable.Create([
+    TTableColumn.Make('V', LengthConstraint(20))
+  ]).WithRows([
+    TTableRow.Make(['x'])
+  ]);
+  State := TTableState.Empty;
+  State.Select(-5);
+  T.RenderStateful(Area, Buf, State);
+  AssertEqInt(0, State.Selected, 'negative selection clamped to 0');
+  Buf.Free;
+end;
+
+procedure Test_SingleRowHeight;
+var
+  T: TTable;
+  Buf: TBuffer;
+  Area: TRect;
+begin
+  Area := TRect.Make(0, 0, 20, 1);
+  Buf := TBuffer.CreateEmpty(Area);
+  T := TTable.Create([
+    TTableColumn.Make('H', LengthConstraint(20))
+  ]).WithRows([
+    TTableRow.Make(['data'])
+  ]);
+  T.Render(Area, Buf);
+  AssertTrue(Pos('H', Buf.RowAsString(0)) > 0, 'height=1: header renders');
+  Buf.Free;
+end;
+
 procedure RegisterTableTests;
 begin
   RegisterTest('table / basic render',         @Test_BasicRender);
@@ -189,6 +286,11 @@ begin
   RegisterTest('table / column alignment',     @Test_ColumnAlignment);
   RegisterTest('table / empty table',          @Test_EmptyTable);
   RegisterTest('table / constraint widths',    @Test_ConstraintWidths);
+  RegisterTest('table / empty area no crash',  @Test_EmptyAreaNoCrash);
+  RegisterTest('table / more cols than cells', @Test_MoreColumnsThanCells);
+  RegisterTest('table / selection clamp high', @Test_SelectionClampToRowCount);
+  RegisterTest('table / selection clamp neg',  @Test_NegativeSelectionClamp);
+  RegisterTest('table / single row height',    @Test_SingleRowHeight);
 end;
 
 end.

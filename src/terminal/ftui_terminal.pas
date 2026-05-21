@@ -138,12 +138,20 @@ uses
 // the assumed contract — fafafa.tui is process-scoped.
 var
   GResizePending: Boolean = False;
+  GTermPending: Boolean = False;
   GSigwinchHooked: Boolean = False;
+  GSigtermHooked: Boolean = False;
   GSavedSigwinch: SigActionRec;
+  GSavedSigterm: SigActionRec;
 
 procedure FtuiSigwinchHandler(Sig: cint); cdecl;
 begin
   GResizePending := True;
+end;
+
+procedure FtuiSigtermHandler(Sig: cint); cdecl;
+begin
+  GTermPending := True;
 end;
 
 procedure HookSigwinch;
@@ -159,11 +167,31 @@ begin
   GSigwinchHooked := True;
 end;
 
+procedure HookSigterm;
+var
+  Act: SigActionRec;
+begin
+  if GSigtermHooked then Exit;
+  FillChar(Act, SizeOf(Act), 0);
+  Act.sa_handler := SigActionHandler(@FtuiSigtermHandler);
+  fpSigEmptySet(Act.sa_mask);
+  Act.sa_flags := 0;
+  fpSigAction(SIGTERM, @Act, @GSavedSigterm);
+  GSigtermHooked := True;
+end;
+
 procedure UnhookSigwinch;
 begin
   if not GSigwinchHooked then Exit;
   fpSigAction(SIGWINCH, @GSavedSigwinch, nil);
   GSigwinchHooked := False;
+end;
+
+procedure UnhookSigterm;
+begin
+  if not GSigtermHooked then Exit;
+  fpSigAction(SIGTERM, @GSavedSigterm, nil);
+  GSigtermHooked := False;
 end;
 
 { TTerminal }
@@ -216,6 +244,7 @@ begin
   FInRawMode := True;
 
   HookSigwinch;
+  HookSigterm;
 
   FBackend := TAnsiBackend.Create(STDOUT_FD);
   FBackend.EnterAlternate;
@@ -251,6 +280,7 @@ begin
 
   LeaveRawMode(STDIN_FD, FSavedTermios);
   UnhookSigwinch;
+  UnhookSigterm;
   FInRawMode := False;
 end;
 
@@ -272,18 +302,10 @@ var
   PatchCount: Integer;
   Tmp: TBuffer;
 begin
-  // Merge: copy base into merged, then apply overlay on top.
+  // Copy base buffer into merged, then apply overlay on top.
   FMerged.Reset;
-  FOverlay.MergeInto(FCurr, FMerged);
-  // For cells not in overlay, copy from FCurr.
-  // (MergeInto only writes marked cells; we need the rest from base.)
-  // Simpler: just diff FCurr with overlay applied.
-  // Actually: MergeInto overwrites marked cells in Dest.  But Dest
-  // was Reset (all CellEmpty).  We need Dest = copy of FCurr first.
-  // Fix: copy FCurr into FMerged, then overlay on top.
-  Move(FCurr.CellAt(FCurr.Area.X, FCurr.Area.Y)^,
-       FMerged.CellAt(FMerged.Area.X, FMerged.Area.Y)^,
-       FCurr.Length_ * SizeOf(TCell));
+  if FCurr.Length_ > 0 then
+    Move(FCurr.ContentPtr^, FMerged.ContentPtr^, FCurr.Length_ * SizeOf(TCell));
   FOverlay.MergeInto(FCurr, FMerged);
   PatchCount := FPrev.DiffInto(FMerged, FPatches);
   FBackend.DrawPatchesN(FPatches, PatchCount);
@@ -344,6 +366,11 @@ var
   Sz: TTermSize;
 begin
   HasResize := False;
+  if GTermPending then
+  begin
+    GTermPending := False;
+    RequestQuit;
+  end;
   if not GResizePending then Exit;
   GResizePending := False;
   if not GetTerminalSize(STDOUT_FD, Sz) then Exit;

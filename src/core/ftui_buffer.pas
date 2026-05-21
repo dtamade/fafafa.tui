@@ -135,7 +135,10 @@ end;
 
 function TBuffer.ContentPtr: PCell;
 begin
-  Result := @FContent[0];
+  if System.Length(FContent) = 0 then
+    Result := nil
+  else
+    Result := @FContent[0];
 end;
 
 function TBuffer.IndexOfPos(X, Y: Integer): Integer;
@@ -328,6 +331,12 @@ var
   W, Row, Col, RowBytes: Integer;
 {$PUSH}{$R-}{$Q-}
 begin
+  if (System.Length(FContent) = 0) or (System.Length(Next.FContent) = 0) then
+  begin
+    SetLength(Patches, 0);
+    Exit;
+  end;
+
   if (Next.FArea.Width <> FArea.Width) or
      (Next.FArea.Height <> FArea.Height) then
   begin
@@ -420,6 +429,12 @@ var
   W, Row, Col, RowBytes: Integer;
 {$PUSH}{$R-}{$Q-}
 begin
+  if (System.Length(FContent) = 0) or (System.Length(Next.FContent) = 0) then
+  begin
+    Result := 0;
+    Exit;
+  end;
+
   Total := System.Length(FContent);
   if (Next.FArea.Width <> FArea.Width) or
      (Next.FArea.Height <> FArea.Height) then

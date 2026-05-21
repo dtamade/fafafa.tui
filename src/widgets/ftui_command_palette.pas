@@ -31,7 +31,7 @@ type
     Visible: Boolean;
     FilteredIndices: array of Integer;
 
-    class function Create: TCommandPaletteState; static;
+    class function Empty: TCommandPaletteState; static;
     procedure Open;
     procedure Close;
     procedure Toggle;
@@ -75,7 +75,7 @@ end;
 
 { TCommandPaletteState }
 
-class function TCommandPaletteState.Create: TCommandPaletteState;
+class function TCommandPaletteState.Empty: TCommandPaletteState;
 begin
   Result.Input := TInputState.Empty;
   Result.Selected := 0;

@@ -201,7 +201,7 @@ begin
       TCommandItem.Make('Git Status', 'Show git status'),
       TCommandItem.Make('Quit', 'Exit application')
     ]).WithWidth(45);
-    CPState := TCommandPaletteState.Create;
+    CPState := TCommandPaletteState.Empty;
 
     if not Term.EnterTui then begin WriteLn('not a tty'); Halt(1); end;
     while not Term.ShouldQuit do

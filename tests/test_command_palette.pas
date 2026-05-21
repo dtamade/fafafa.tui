@@ -40,7 +40,7 @@ end;
 procedure Test_CreateState;
 var S: TCommandPaletteState;
 begin
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   AssertTrue(not S.Visible, 'not visible');
   AssertEqInt(0, S.Selected, 'selected 0');
 end;
@@ -48,7 +48,7 @@ end;
 procedure Test_OpenClose;
 var S: TCommandPaletteState;
 begin
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   AssertTrue(S.Visible, 'visible after open');
   S.Close;
@@ -65,7 +65,7 @@ begin
     TCommandItem.Make('Save File', 'Save current'),
     TCommandItem.Make('Quit', 'Exit app')
   ]);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   S.Input.Text := 'fi';
   CP.UpdateFilter(S);
@@ -82,7 +82,7 @@ begin
     TCommandItem.Make('B', ''),
     TCommandItem.Make('C', '')
   ]);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   CP.UpdateFilter(S);
   AssertEqInt(3, Length(S.FilteredIndices), 'all match empty query');
@@ -98,7 +98,7 @@ begin
     TCommandItem.Make('B', ''),
     TCommandItem.Make('C', '')
   ]);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   CP.UpdateFilter(S);
   S.SelectNext;
@@ -121,7 +121,7 @@ begin
     TCommandItem.Make('Beta', ''),
     TCommandItem.Make('Gamma', '')
   ]);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   S.Input.Text := 'b';
   CP.UpdateFilter(S);
@@ -141,7 +141,7 @@ begin
     TCommandItem.Make('Open', 'Open file'),
     TCommandItem.Make('Save', 'Save file')
   ]).WithWidth(40);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   S.Open;
   CP.RenderStateful(Area, Buf, S);
   AssertTrue(Pos('Open', Buf.RowAsString(4)) > 0, 'item visible');
@@ -158,7 +158,7 @@ begin
   Area := TRect.Make(0, 0, 60, 20);
   Buf := TBuffer.CreateEmpty(Area);
   CP := TCommandPalette.Create([TCommandItem.Make('X', '')]);
-  S := TCommandPaletteState.Create;
+  S := TCommandPaletteState.Empty;
   CP.RenderStateful(Area, Buf, S);
   AssertTrue(Pos('X', Buf.RowAsString(4)) = 0, 'nothing rendered when hidden');
   Buf.Free;

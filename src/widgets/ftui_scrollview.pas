@@ -44,7 +44,7 @@ type
     function WithShowScrollbar(V: Boolean): TScrollView;
     function WithBlock(const B: TBlock): TScrollView;
     function ContentArea(const Area: TRect): TRect;
-    procedure RenderFrame(const Area: TRect; ABuf: TBuffer; var State: TScrollViewState);
+    procedure RenderStateful(const Area: TRect; ABuf: TBuffer; var State: TScrollViewState);
   end;
 
 implementation
@@ -152,7 +152,7 @@ begin
     Result := Inner;
 end;
 
-procedure TScrollView.RenderFrame(const Area: TRect; ABuf: TBuffer; var State: TScrollViewState);
+procedure TScrollView.RenderStateful(const Area: TRect; ABuf: TBuffer; var State: TScrollViewState);
 var
   Inner: TRect;
   ScrollCol, ViewH, ThumbPos, ThumbLen, MaxOffset, I: Integer;

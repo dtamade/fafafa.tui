@@ -109,7 +109,7 @@ begin
   State := TScrollViewState.Empty;
   State.ContentHeight := 30;
   State.OffsetY := 0;
-  SV.RenderFrame(Area, Buf, State);
+  SV.RenderStateful(Area, Buf, State);
   Row := Buf.RowAsString(0);
   AssertTrue(Length(Row) > 0, 'scrollbar rendered');
   Buf.Free;
@@ -128,7 +128,7 @@ begin
   State := TScrollViewState.Empty;
   State.ContentHeight := 15;
   State.OffsetY := 999;
-  SV.RenderFrame(Area, Buf, State);
+  SV.RenderStateful(Area, Buf, State);
   AssertEqInt(5, State.OffsetY, 'clamped to max offset');
   Buf.Free;
 end;

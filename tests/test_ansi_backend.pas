@@ -136,12 +136,128 @@ begin
   end;
 end;
 
+procedure Test_ColorChangeEmitsNewSgr;
+var
+  Be: TAnsiBackend;
+  Prev, Curr: TBuffer;
+  Patches: TDiffEntries;
+  S: AnsiString;
+  ResetCount, I: Integer;
+begin
+  Be := TAnsiBackend.Create(-1);
+  Prev := TBuffer.CreateEmpty(TRect.Make(0, 0, 2, 1));
+  Curr := TBuffer.CreateEmpty(TRect.Make(0, 0, 2, 1));
+  try
+    Curr.SetString(0, 0, 'A', TStyle.Default.WithFg(clRed));
+    Curr.SetString(1, 0, 'B', TStyle.Default.WithFg(clGreen));
+    Prev.Diff(Curr, Patches);
+    Be.DrawPatches(Patches);
+    S := PendingAsString(Be);
+    ResetCount := 0;
+    for I := 1 to Length(S) - 3 do
+      if Copy(S, I, 4) = #27'[0m' then
+        Inc(ResetCount);
+    AssertEqInt(2, ResetCount, 'color change: two SGR resets');
+  finally
+    Curr.Free;
+    Prev.Free;
+    Be.Free;
+  end;
+end;
+
+procedure Test_ModifierEmitted;
+var
+  Be: TAnsiBackend;
+  Prev, Curr: TBuffer;
+  Patches: TDiffEntries;
+  S: AnsiString;
+begin
+  Be := TAnsiBackend.Create(-1);
+  Prev := TBuffer.CreateEmpty(TRect.Make(0, 0, 1, 1));
+  Curr := TBuffer.CreateEmpty(TRect.Make(0, 0, 1, 1));
+  try
+    Curr.SetString(0, 0, 'B', TStyle.Default.WithModifier([mbBold]));
+    Prev.Diff(Curr, Patches);
+    Be.DrawPatches(Patches);
+    S := PendingAsString(Be);
+    AssertTrue(Pos(#27'[1m', S) > 0, 'bold modifier: SGR 1 emitted');
+  finally
+    Curr.Free;
+    Prev.Free;
+    Be.Free;
+  end;
+end;
+
+procedure Test_EmptyPatchesNoCrash;
+var
+  Be: TAnsiBackend;
+  Patches: TDiffEntries;
+begin
+  Be := TAnsiBackend.Create(-1);
+  try
+    SetLength(Patches, 0);
+    Be.DrawPatches(Patches);
+    AssertEqInt(0, Be.PendingLength, 'empty patches: nothing emitted');
+  finally
+    Be.Free;
+  end;
+end;
+
+procedure Test_NonAdjacentCellsEmitMoveTo;
+var
+  Be: TAnsiBackend;
+  Patches: TDiffEntries;
+  S: AnsiString;
+  MoveCount, I: Integer;
+begin
+  Be := TAnsiBackend.Create(-1);
+  try
+    SetLength(Patches, 2);
+    Patches[0].X := 0; Patches[0].Y := 0;
+    Patches[0].Cell := CellEmpty;
+    Patches[0].Cell.Glyph.Len := 1;
+    Patches[0].Cell.Glyph.Bytes[0] := Ord('A');
+    Patches[1].X := 5; Patches[1].Y := 2;
+    Patches[1].Cell := CellEmpty;
+    Patches[1].Cell.Glyph.Len := 1;
+    Patches[1].Cell.Glyph.Bytes[0] := Ord('B');
+    Be.DrawPatches(Patches);
+    S := PendingAsString(Be);
+    MoveCount := 0;
+    for I := 1 to Length(S) - 1 do
+      if S[I] = 'H' then Inc(MoveCount);
+    AssertEqInt(2, MoveCount, 'non-adjacent: two MoveTo sequences');
+  finally
+    Be.Free;
+  end;
+end;
+
+procedure Test_DiscardPendingClearsBuffer;
+var
+  Be: TAnsiBackend;
+begin
+  Be := TAnsiBackend.Create(-1);
+  try
+    Be.HideCursor;
+    AssertTrue(Be.PendingLength > 0, 'has pending');
+    Be.DiscardPending;
+    AssertEqInt(0, Be.PendingLength, 'discard: buffer empty');
+  finally
+    Be.Free;
+  end;
+end;
+
 procedure RegisterAnsiBackendTests;
 begin
   RegisterTest('backend / draw single ascii patch',     @Test_DrawSingleAsciiPatch);
   RegisterTest('backend / adjacent cells reuse cursor', @Test_AdjacentCellsReuseCursor);
   RegisterTest('backend / style cache minimises repeats',@Test_StyleCacheMinimisesRepeats);
   RegisterTest('backend / Flush(-1) returns False',     @Test_FlushWithFdMinusOneFails);
+  RegisterTest('backend / color change emits new sgr',  @Test_ColorChangeEmitsNewSgr);
+  RegisterTest('backend / modifier emitted',            @Test_ModifierEmitted);
+  RegisterTest('backend / empty patches no crash',      @Test_EmptyPatchesNoCrash);
+  RegisterTest('backend / non-adjacent emit moveto',    @Test_NonAdjacentCellsEmitMoveTo);
+  RegisterTest('backend / discard pending clears',      @Test_DiscardPendingClearsBuffer);
 end;
 
 end.

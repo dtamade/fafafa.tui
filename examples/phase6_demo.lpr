@@ -92,7 +92,7 @@ begin
       .WithTitle(' Progress ')
       .WithBorderStyle(Theme.Border));
   ScrollState.ContentHeight := 8;
-  SV.RenderFrame(G.Cell(1, 0), Frame.Buffer, ScrollState);
+  SV.RenderStateful(G.Cell(1, 0), Frame.Buffer, ScrollState);
   PG := TProgressGroup.Create([
     TProgressItem.Make('Build  ', (Tick mod 100) / 100.0),
     TProgressItem.Make('Test   ', ((Tick + 30) mod 100) / 100.0),
