@@ -29,10 +29,9 @@ begin
   try
     Sp := TSparkline.Create([]);
     Sp.Render(Buf.Area, Buf);
-    // All cells should remain as spaces
+    // Buffer should remain untouched (Reset state: Glyph.Len=0)
     CP := Buf.CellAt(0, 0);
-    AssertTrue(CP^.Glyph.Len = 1, 'empty data: cell is single byte');
-    AssertTrue(CP^.Glyph.Bytes[0] = 32, 'empty data: cell is space');
+    AssertTrue(CP^.Glyph.Len = 0, 'empty data: cell untouched by render');
   finally
     Buf.Free;
   end;

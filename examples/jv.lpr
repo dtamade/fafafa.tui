@@ -37,9 +37,6 @@ type
     FRoot: TJsonNode;
     FTreeNodes: array of TTreeNode;
     FTreeState: TTreeState;
-    FFlatLabels: array of AnsiString;
-    FFlatPaths: array of AnsiString;
-    FFlatCount: Integer;
     FSearchMode: Boolean;
     FSearchState: TInputState;
     FSearchHit: Integer;
@@ -47,7 +44,6 @@ type
     FError: AnsiString;
     procedure BuildTree;
     procedure BuildTreeNode(const JN: TJsonNode; var TN: TTreeNode);
-    procedure FlattenJson(const JN: TJsonNode; const Path: AnsiString);
     function ParseJson(const S: AnsiString; var P: Integer): TJsonNode;
     function ParseString(const S: AnsiString; var P: Integer): AnsiString;
     function ParseNumber(const S: AnsiString; var P: Integer): AnsiString;
@@ -263,95 +259,115 @@ begin
     BuildTreeNode(FRoot, FTreeNodes[0]);
   end;
   FTreeState := TTreeState.Empty;
-
-  // Build flat label/path arrays for search and path display
-  FFlatCount := 0;
-  SetLength(FFlatLabels, 256);
-  SetLength(FFlatPaths, 256);
-  if (FRoot.Kind = jkObject) or (FRoot.Kind = jkArray) then
-    for I := 0 to High(FRoot.Children) do
-      FlattenJson(FRoot.Children[I], '$')
-  else
-    FlattenJson(FRoot, '$');
-  SetLength(FFlatLabels, FFlatCount);
-  SetLength(FFlatPaths, FFlatCount);
 end;
 
-procedure TJvApp.FlattenJson(const JN: TJsonNode; const Path: AnsiString);
+{ Visible-tree walk: mirrors TTree's DFS flattening logic }
+
+type
+  TWalkResult = record
+    Found: Boolean;
+    Label_: AnsiString;
+    Path: AnsiString;
+  end;
+
+procedure WalkJsonNodes(const Nodes: array of TJsonNode;
+  const ParentPath: AnsiString; var State: TTreeState;
+  var FlatIdx: Integer; Target: Integer; var Res: TWalkResult);
 var
   I: Integer;
   CurPath: AnsiString;
+  IsOpen: Boolean;
 begin
-  if JN.Key <> '' then
+  for I := 0 to High(Nodes) do
   begin
-    if (Length(JN.Key) > 0) and (JN.Key[1] in ['0'..'9']) then
-      CurPath := Path + '[' + JN.Key + ']'
-    else
-      CurPath := Path + '.' + JN.Key;
-  end
-  else
-    CurPath := Path;
-
-  if FFlatCount >= Length(FFlatLabels) then
-  begin
-    SetLength(FFlatLabels, FFlatCount * 2);
-    SetLength(FFlatPaths, FFlatCount * 2);
-  end;
-  FFlatLabels[FFlatCount] := FTreeNodes[0].Label_; // placeholder, will fix
-  FFlatPaths[FFlatCount] := CurPath;
-
-  // Build the label the same way BuildTreeNode does
-  case JN.Kind of
-    jkObject:
-      if JN.Key <> '' then
-        FFlatLabels[FFlatCount] := JN.Key + ': {' + IntToStr(Length(JN.Children)) + '}'
+    if Nodes[I].Key <> '' then
+    begin
+      if (Length(Nodes[I].Key) > 0) and (Nodes[I].Key[1] in ['0'..'9']) then
+        CurPath := ParentPath + '[' + Nodes[I].Key + ']'
       else
-        FFlatLabels[FFlatCount] := '{' + IntToStr(Length(JN.Children)) + '}';
-    jkArray:
-      if JN.Key <> '' then
-        FFlatLabels[FFlatCount] := JN.Key + ': [' + IntToStr(Length(JN.Children)) + ']'
-      else
-        FFlatLabels[FFlatCount] := '[' + IntToStr(Length(JN.Children)) + ']';
-  else
-    if JN.Key <> '' then
-      FFlatLabels[FFlatCount] := JN.Key + ': ' + JN.Value
+        CurPath := ParentPath + '.' + Nodes[I].Key;
+    end
     else
-      FFlatLabels[FFlatCount] := JN.Value;
-  end;
-  Inc(FFlatCount);
+      CurPath := ParentPath;
 
-  for I := 0 to High(JN.Children) do
-    FlattenJson(JN.Children[I], CurPath);
+    if FlatIdx = Target then
+    begin
+      Res.Found := True;
+      Res.Path := CurPath;
+      case Nodes[I].Kind of
+        jkObject:
+          if Nodes[I].Key <> '' then
+            Res.Label_ := Nodes[I].Key + ': {' + IntToStr(Length(Nodes[I].Children)) + '}'
+          else
+            Res.Label_ := '{' + IntToStr(Length(Nodes[I].Children)) + '}';
+        jkArray:
+          if Nodes[I].Key <> '' then
+            Res.Label_ := Nodes[I].Key + ': [' + IntToStr(Length(Nodes[I].Children)) + ']'
+          else
+            Res.Label_ := '[' + IntToStr(Length(Nodes[I].Children)) + ']';
+      else
+        if Nodes[I].Key <> '' then
+          Res.Label_ := Nodes[I].Key + ': ' + Nodes[I].Value
+        else
+          Res.Label_ := Nodes[I].Value;
+      end;
+    end;
+
+    IsOpen := (Length(Nodes[I].Children) > 0) and State.IsOpen(FlatIdx);
+    Inc(FlatIdx);
+    if Res.Found then Exit;
+
+    if IsOpen then
+    begin
+      WalkJsonNodes(Nodes[I].Children, CurPath, State, FlatIdx, Target, Res);
+      if Res.Found then Exit;
+    end;
+  end;
 end;
 
 { Search and navigation }
 
 function TJvApp.GetCurrentPath: AnsiString;
-var Sel: Integer;
+var
+  FlatIdx: Integer;
+  Res: TWalkResult;
 begin
-  Sel := FTreeState.Selected;
-  if (Sel >= 0) and (Sel < FFlatCount) then
-    Result := FFlatPaths[Sel]
+  Res.Found := False;
+  FlatIdx := 0;
+  if (FRoot.Kind = jkObject) or (FRoot.Kind = jkArray) then
+    WalkJsonNodes(FRoot.Children, '$', FTreeState, FlatIdx, FTreeState.Selected, Res)
+  else
+  begin
+    Res.Found := True;
+    Res.Path := '$';
+  end;
+  if Res.Found then
+    Result := Res.Path
   else
     Result := '$';
 end;
 
 procedure TJvApp.SearchNext;
 var
-  I, Idx: Integer;
-  Query, Lbl: AnsiString;
+  FlatIdx, I, Target, FlatN: Integer;
+  Res: TWalkResult;
+  Query: AnsiString;
 begin
   Query := LowerCase(FSearchState.Text);
   if Query = '' then Exit;
-  if FFlatCount = 0 then Exit;
-  for I := 1 to FFlatCount do
+  FlatN := FTreeState.FlatCount;
+  if FlatN = 0 then Exit;
+  for I := 1 to FlatN do
   begin
-    Idx := (FTreeState.Selected + I) mod FFlatCount;
-    Lbl := LowerCase(FFlatLabels[Idx]);
-    if Pos(Query, Lbl) > 0 then
+    Target := (FTreeState.Selected + I) mod FlatN;
+    Res.Found := False;
+    FlatIdx := 0;
+    if (FRoot.Kind = jkObject) or (FRoot.Kind = jkArray) then
+      WalkJsonNodes(FRoot.Children, '$', FTreeState, FlatIdx, Target, Res);
+    if Res.Found and (Pos(Query, LowerCase(Res.Label_)) > 0) then
     begin
-      FTreeState.Selected := Idx;
-      FSearchHit := Idx;
+      FTreeState.Selected := Target;
+      FSearchHit := Target;
       Exit;
     end;
   end;
