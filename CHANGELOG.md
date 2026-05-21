@@ -1,5 +1,60 @@
 # Changelog
 
+## v1.0.0-rc1 (2026-05-21)
+
+首个 release candidate。API 冻结——stable 单元的类型定义和函数签名在 v1.x 内不变。
+
+### Highlights
+
+- 43 个 widget，覆盖数据展示、导航容器、输入交互、反馈提示四大类
+- 双缓冲 diff 渲染引擎，200×60 全屏 < 1ms
+- 完整键盘 + 鼠标全协议（SGR 1003h + CSI u）
+- TApp 应用脚手架：20 行代码 → 可运行 TUI 应用
+- 664 个测试，7 个性能基准
+- 零外部依赖
+
+### 稳定性
+
+- 55 个单元标记为 **stable**（见 `docs/api-stability.md`）
+- 6 个单元保留 **experimental**（keybind, event_loop, image, syntax, input_editor, textarea）
+- 7 个单元标记为 **internal**
+
+### 安全
+
+- 修复 4 个内存安全 bug（空 buffer 指针越界）
+- 添加 SIGTERM handler，外部 kill 信号触发正常终端恢复
+- 所有热路径零字符串拼接，经审计确认
+
+### API 变更（相对于 v0.9.0）
+
+- `TScrollView.RenderFrame` → `TScrollView.RenderStateful`（命名一致性）
+- `TCommandPaletteState.Create` → `TCommandPaletteState.Empty`（命名一致性）
+
+### 性能
+
+| Benchmark | 结果 | 目标 |
+|-----------|------|------|
+| bench_diff (200×60) | 957 μs/frame | < 1ms |
+| bench_render (80×24) | 140 μs/frame | < 1ms |
+| bench_layout (100K) | 0.41 μs/call | < 5μs |
+| bench_input (100K) | 50 ns/event | < 1μs |
+| bench_cjk | 0.95x vs ASCII | ~1.0x |
+
+### 已知限制
+
+- Grapheme clustering 不处理 ZWJ emoji 序列（单 codepoint 逐个渲染）
+- 仅 Linux/macOS ANSI 终端，无 Windows 原生支持
+- 同步阻塞事件循环（无异步 I/O）
+
+### 版本承诺
+
+v1.0 起，stable 单元遵循语义化版本：
+- patch (v1.0.x)：bug 修复，不改 API
+- minor (v1.x.0)：新增功能，不 break 现有 API
+- experimental 单元可能在 minor 版本变化，CHANGELOG 会列出
+
+---
+
 ## v0.9.0 (2026-05-19) — M4 性能基准 + cli888 场景测试
 
 ### 性能优化
