@@ -144,13 +144,12 @@ end;
 constructor TTaskThread.Create(AManager: TTaskManager; AId: TTaskId;
                                AFunc: TTaskFunc; const ACtx: TTaskContext);
 begin
-  inherited Create(True);
   FreeOnTerminate := False;
   FManager := AManager;
   FId := AId;
   FFunc := AFunc;
   FContext := ACtx;
-  Start;
+  inherited Create(False);
 end;
 
 procedure TTaskThread.Execute;
@@ -237,18 +236,27 @@ begin
   FActive[Slot].Id := Id;
   FActive[Slot].Cancel.FCancelled := 0;
   FActive[Slot].Status := tsRunning;
+  Inc(FActiveCount);
   Ctx.Param := Param;
   Ctx.ParamSize := ParamSize;
   Ctx.Cancel := @FActive[Slot].Cancel;
   FActive[Slot].Thread := TTaskThread.Create(Self, Id, Func, Ctx);
-  Inc(FActiveCount);
 end;
 
 procedure TTaskManager.ScheduleNext;
 var
-  Slot: Integer;
+  Slot, I, LaunchCount: Integer;
   P: TPendingTask;
+  Ctx: TTaskContext;
+  ToLaunch: array[0..MAX_CONCURRENT_TASKS - 1] of record
+    Slot: Integer;
+    Id: TTaskId;
+    Func: TTaskFunc;
+    Param: Pointer;
+    ParamSize: UInt32;
+  end;
 begin
+  LaunchCount := 0;
   EnterCriticalSection(FLock);
   try
     while (FPendCount > 0) and (FActiveCount < MAX_CONCURRENT_TASKS) do
@@ -258,10 +266,27 @@ begin
       P := FPending[FPendHead];
       FPendHead := (FPendHead + 1) mod TASK_QUEUE_CAPACITY;
       Dec(FPendCount);
-      LaunchInSlot(Slot, P.Id, P.Func, P.ParamCopy, P.ParamSize);
+      FActive[Slot].Id := P.Id;
+      FActive[Slot].Cancel.FCancelled := 0;
+      FActive[Slot].Status := tsRunning;
+      FActive[Slot].Thread := nil;
+      Inc(FActiveCount);
+      ToLaunch[LaunchCount].Slot := Slot;
+      ToLaunch[LaunchCount].Id := P.Id;
+      ToLaunch[LaunchCount].Func := P.Func;
+      ToLaunch[LaunchCount].Param := P.ParamCopy;
+      ToLaunch[LaunchCount].ParamSize := P.ParamSize;
+      Inc(LaunchCount);
     end;
   finally
     LeaveCriticalSection(FLock);
+  end;
+  for I := 0 to LaunchCount - 1 do
+  begin
+    Ctx.Param := ToLaunch[I].Param;
+    Ctx.ParamSize := ToLaunch[I].ParamSize;
+    Ctx.Cancel := @FActive[ToLaunch[I].Slot].Cancel;
+    FActive[ToLaunch[I].Slot].Thread := TTaskThread.Create(Self, ToLaunch[I].Id, ToLaunch[I].Func, Ctx);
   end;
 end;
 
@@ -270,6 +295,8 @@ var
   Id: TTaskId;
   ParamCopy: Pointer;
   Slot: Integer;
+  ShouldLaunch: Boolean;
+  Ctx: TTaskContext;
 begin
   Id := TTaskId(InterlockedIncrement(FNextId));
   ParamCopy := nil;
@@ -279,6 +306,8 @@ begin
     Move(Spec.Param^, ParamCopy^, Spec.ParamSize);
   end;
 
+  ShouldLaunch := False;
+  Slot := -1;
   EnterCriticalSection(FLock);
   try
     if FShuttingDown then
@@ -289,7 +318,14 @@ begin
     end;
     Slot := FindFreeSlot;
     if (Slot >= 0) and (FActiveCount < MAX_CONCURRENT_TASKS) then
-      LaunchInSlot(Slot, Id, Spec.Func, ParamCopy, Spec.ParamSize)
+    begin
+      FActive[Slot].Id := Id;
+      FActive[Slot].Cancel.FCancelled := 0;
+      FActive[Slot].Status := tsRunning;
+      FActive[Slot].Thread := nil;
+      Inc(FActiveCount);
+      ShouldLaunch := True;
+    end
     else
     begin
       if FPendCount >= TASK_QUEUE_CAPACITY then
@@ -308,6 +344,15 @@ begin
   finally
     LeaveCriticalSection(FLock);
   end;
+
+  if ShouldLaunch then
+  begin
+    Ctx.Param := ParamCopy;
+    Ctx.ParamSize := Spec.ParamSize;
+    Ctx.Cancel := @FActive[Slot].Cancel;
+    FActive[Slot].Thread := TTaskThread.Create(Self, Id, Spec.Func, Ctx);
+  end;
+
   Result := Id;
 end;
 
