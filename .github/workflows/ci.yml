@@ -68,19 +68,22 @@ jobs:
       # --- Linux / macOS: use Makefile ---
       - name: Run tests (Unix)
         if: runner.os != 'Windows'
-        run: make test
+        run: make test FPC_BASE_FLAGS="-MObjFPC -Sh -O1 -gl"
+        timeout-minutes: 10
 
       - name: Build examples (Unix)
         if: runner.os != 'Windows'
-        run: make examples
+        run: make examples FPC_BASE_FLAGS="-MObjFPC -Sh -O1 -gl"
+        timeout-minutes: 10
 
       # --- Windows: direct fpc invocation (avoids Makefile/bash path issues) ---
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         shell: cmd
+        timeout-minutes: 10
         run: |
           if not exist build\bin mkdir build\bin
-          fpc -MObjFPC -Sh -O3 -gl -CR -Xs -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FuC:\tools\freepascal\units\i386-win32\* -FEbuild\bin tests\test_runner.lpr
+          fpc -MObjFPC -Sh -O1 -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FuC:\tools\freepascal\units\i386-win32\* -FEbuild\bin tests\test_runner.lpr
           if errorlevel 1 exit /b 1
           build\bin\test_runner.exe
           if errorlevel 1 exit /b 1
@@ -88,10 +91,11 @@ jobs:
       - name: Build examples (Windows)
         if: runner.os == 'Windows'
         shell: cmd
+        timeout-minutes: 10
         run: |
           if not exist build\bin mkdir build\bin
           for %%f in (examples\*.lpr) do (
             echo [BUILD] %%f
-            fpc -MObjFPC -Sh -O3 -gl -CR -Xs -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FuC:\tools\freepascal\units\i386-win32\* -FEbuild\bin %%f
+            fpc -MObjFPC -Sh -O1 -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FuC:\tools\freepascal\units\i386-win32\* -FEbuild\bin %%f
             if errorlevel 1 exit /b 1
           )
