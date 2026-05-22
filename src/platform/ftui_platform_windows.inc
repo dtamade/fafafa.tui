@@ -20,7 +20,8 @@ function PlatformIsTerminal(Fd: TPlatformFd): Boolean;
 var
   Mode: DWORD;
 begin
-  Result := GetConsoleMode(Fd, @Mode);
+  Mode := 0;
+  Result := GetConsoleMode(Fd, Mode);
 end;
 
 function PlatformGetTermSize(Fd: TPlatformFd; out Sz: TTermSize): Boolean;
@@ -30,7 +31,7 @@ var
 begin
   Result := False;
   hOut := GetStdHandle(STD_OUTPUT_HANDLE);
-  if not GetConsoleScreenBufferInfo(hOut, @Info) then Exit;
+  if not GetConsoleScreenBufferInfo(hOut, Info) then Exit;
   Sz.Cols := Info.srWindow.Right - Info.srWindow.Left + 1;
   Sz.Rows := Info.srWindow.Bottom - Info.srWindow.Top + 1;
   Result := (Sz.Cols > 0) and (Sz.Rows > 0);
@@ -43,8 +44,8 @@ begin
   Result := False;
   hIn := GetStdHandle(STD_INPUT_HANDLE);
   hOut := GetStdHandle(STD_OUTPUT_HANDLE);
-  if not GetConsoleMode(hIn, @State.InMode) then Exit;
-  if not GetConsoleMode(hOut, @State.OutMode) then Exit;
+  if not GetConsoleMode(hIn, State.InMode) then Exit;
+  if not GetConsoleMode(hOut, State.OutMode) then Exit;
   if not SetConsoleMode(hIn, ENABLE_VIRTUAL_TERMINAL_INPUT) then Exit;
   if not SetConsoleMode(hOut,
     ENABLE_PROCESSED_OUTPUT or ENABLE_VIRTUAL_TERMINAL_PROCESSING or
@@ -69,7 +70,8 @@ var
   BytesRead: DWORD;
 begin
   hIn := GetStdHandle(STD_INPUT_HANDLE);
-  if ReadFile(hIn, Buf^, DWORD(Count), @BytesRead, nil) then
+  BytesRead := 0;
+  if ReadFile(hIn, Buf^, DWORD(Count), BytesRead, nil) then
     Result := Integer(BytesRead)
   else
     Result := -1;
@@ -85,7 +87,8 @@ begin
   Sent := 0;
   while Sent < Count do
   begin
-    if not WriteFile(hOut, (Buf + Sent)^, DWORD(Count - Sent), @Written, nil) then
+    Written := 0;
+    if not WriteFile(hOut, (Buf + Sent)^, DWORD(Count - Sent), Written, nil) then
       Exit(False);
     if Written = 0 then Exit(False);
     Inc(Sent, Integer(Written));
