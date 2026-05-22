@@ -256,6 +256,64 @@ begin
   AssertEqStr('test', Spec.Name, 'Name assigned');
 end;
 
+procedure Test_LoadingGroupMultiSlot;
+var
+  G: TLoadingGroup;
+  Slots: array[0..1] of TCompletionSlot;
+begin
+  G := TLoadingGroup.Empty;
+  G.Start(0, 10, 1000);
+  G.Start(1, 11, 1000);
+  G.Start(2, 12, 1000);
+  AssertEqInt(3, G.Count, 'Count = 3');
+  AssertTrue(G.AnyLoading, 'has loading');
+
+  Slots[0].Id := 10;
+  Slots[0].Result.Status := tsCompleted;
+  Slots[0].Result.Data := nil;
+  Slots[0].Result.DataSize := 0;
+  Slots[0].Result.Error := '';
+  Slots[1].Id := 12;
+  Slots[1].Result.Status := tsFailed;
+  Slots[1].Result.Data := nil;
+  Slots[1].Result.DataSize := 0;
+  Slots[1].Result.Error := 'err';
+  G.Update(Slots, 2);
+
+  AssertTrue(G.GetPhase(0) = lpSuccess, 'slot 0 success');
+  AssertTrue(G.GetPhase(1) = lpLoading, 'slot 1 still loading');
+  AssertTrue(G.GetPhase(2) = lpError, 'slot 2 error');
+  AssertFalse(G.AllDone, 'not all done');
+  AssertTrue(G.AnyError, 'has error');
+end;
+
+procedure Test_LoadingGroupBoundary;
+var
+  G: TLoadingGroup;
+begin
+  G := TLoadingGroup.Empty;
+  G.Start(15, 99, 500);
+  AssertEqInt(16, G.Count, 'Count = 16 after start at index 15');
+  AssertTrue(G.GetPhase(15) = lpLoading, 'index 15 loading');
+  AssertTrue(G.GetPhase(-1) = lpIdle, 'negative index returns idle');
+end;
+
+procedure Test_LoadingGroupUnknownId;
+var
+  G: TLoadingGroup;
+  Slots: array[0..0] of TCompletionSlot;
+begin
+  G := TLoadingGroup.Empty;
+  G.Start(0, 1, 1000);
+  Slots[0].Id := 999;
+  Slots[0].Result.Status := tsCompleted;
+  Slots[0].Result.Data := nil;
+  Slots[0].Result.DataSize := 0;
+  Slots[0].Result.Error := '';
+  G.Update(Slots, 1);
+  AssertTrue(G.GetPhase(0) = lpLoading, 'unknown id does not affect existing items');
+end;
+
 procedure RegisterTaskTests;
 begin
   {$IF FPC_FULLVERSION >= 30300}
@@ -267,6 +325,9 @@ begin
   {$ENDIF}
   RegisterTest('task / LoadingGroup phases',   @Test_LoadingGroupPhases);
   RegisterTest('task / LoadingGroup error',    @Test_LoadingGroupError);
+  RegisterTest('task / LoadingGroup multi',    @Test_LoadingGroupMultiSlot);
+  RegisterTest('task / LoadingGroup boundary', @Test_LoadingGroupBoundary);
+  RegisterTest('task / LoadingGroup unknown',  @Test_LoadingGroupUnknownId);
   RegisterTest('task / MakeSpec helper',       @Test_MakeSpec);
 end;
 

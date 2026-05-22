@@ -84,7 +84,9 @@ uses
   test_format,
   test_terminal,
   test_panel,
-  test_task;
+  test_task,
+  test_borders,
+  test_platform;
 
 var
   Failed: Integer;
@@ -163,6 +165,8 @@ begin
   RegisterTerminalTests;
   RegisterPanelTests;
   RegisterTaskTests;
+  RegisterBordersTests;
+  RegisterPlatformTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)
