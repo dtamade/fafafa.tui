@@ -234,6 +234,90 @@ begin
   end;
 end;
 
+procedure Test_SingleItemList;
+var
+  Buf: TBuffer;
+  L: TList;
+  S: TListState;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 10, 3));
+  try
+    L := TList.FromStrings(['only']);
+    S := TListState.Empty;
+    S.HasSelection := True;
+    S.Selected := 0;
+    L.RenderStateful(Buf.Area, Buf, S);
+    AssertEqInt(0, S.Selected, 'selected stays 0');
+    AssertEqInt(0, S.Offset, 'offset stays 0');
+  finally
+    Buf.Free;
+  end;
+end;
+
+procedure Test_ZeroHeightNoCrash;
+var
+  Buf: TBuffer;
+  L: TList;
+  S: TListState;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 10, 0));
+  try
+    L := TList.FromStrings(['a', 'b', 'c']);
+    S := TListState.Empty;
+    S.HasSelection := True;
+    S.Selected := 1;
+    L.RenderStateful(Buf.Area, Buf, S);
+    AssertTrue(True, 'no crash on zero height');
+  finally
+    Buf.Free;
+  end;
+end;
+
+procedure Test_ScrollDownThenUp;
+var
+  Buf: TBuffer;
+  L: TList;
+  S: TListState;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 8, 3));
+  try
+    L := TList.FromStrings(['a', 'b', 'c', 'd', 'e']);
+    S := TListState.Empty;
+    S.HasSelection := True;
+    S.Selected := 4;
+    L.RenderStateful(Buf.Area, Buf, S);
+    AssertTrue(S.Offset > 0, 'scrolled down');
+    S.Selected := 0;
+    L.RenderStateful(Buf.Area, Buf, S);
+    AssertEqInt(0, S.Offset, 'scrolled back to top');
+  finally
+    Buf.Free;
+  end;
+end;
+
+procedure Test_MidScrollOffsetStable;
+var
+  Buf: TBuffer;
+  L: TList;
+  S: TListState;
+  PrevOffset: Integer;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 8, 3));
+  try
+    L := TList.FromStrings(['a', 'b', 'c', 'd', 'e']);
+    S := TListState.Empty;
+    S.HasSelection := True;
+    S.Selected := 3;
+    L.RenderStateful(Buf.Area, Buf, S);
+    PrevOffset := S.Offset;
+    S.Selected := 2;
+    L.RenderStateful(Buf.Area, Buf, S);
+    AssertTrue(S.Offset <= PrevOffset, 'offset does not increase when moving up within window');
+  finally
+    Buf.Free;
+  end;
+end;
+
 procedure RegisterListTests;
 begin
   RegisterTest('list / renders three items left-aligned',   @Test_RendersThreeItemsLeftAligned);
@@ -246,6 +330,10 @@ begin
   RegisterTest('list / empty list clears selection',         @Test_EmptyListClearsSelection);
   RegisterTest('list / inside block with title',             @Test_ListInsideBlock);
   RegisterTest('list / out-of-bounds selection clamps',      @Test_OutOfBoundsSelectionClampsToLast);
+  RegisterTest('list / single item',                         @Test_SingleItemList);
+  RegisterTest('list / zero height no crash',                @Test_ZeroHeightNoCrash);
+  RegisterTest('list / scroll down then up',                 @Test_ScrollDownThenUp);
+  RegisterTest('list / mid scroll offset stable',            @Test_MidScrollOffsetStable);
 end;
 
 end.

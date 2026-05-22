@@ -97,6 +97,47 @@ begin
   AssertEqStr(#27']52;c;YWJj' + #27'\', Seq, 'OSC52 three chars (no pad)');
 end;
 
+procedure Test_OSC52Utf8Content;
+var
+  Cb: TClipboard;
+  Seq: AnsiString;
+begin
+  Cb.Method := cmOSC52;
+  Seq := Cb.GetOSC52Copy(#$E4#$BD#$A0#$E5#$A5#$BD);
+  AssertTrue(Length(Seq) > 10, 'UTF-8 content produces non-trivial OSC52');
+  AssertTrue(Pos(#27']52;c;', Seq) = 1, 'has OSC52 prefix');
+  AssertTrue(Pos(#27'\', Seq) > 0, 'has OSC52 suffix');
+end;
+
+procedure Test_OSC52NewlineInContent;
+var
+  Cb: TClipboard;
+  Seq: AnsiString;
+begin
+  Cb.Method := cmOSC52;
+  Seq := Cb.GetOSC52Copy('line1'#10'line2');
+  AssertTrue(Pos(#10, Seq) = 0, 'newline is base64-encoded, not raw in sequence');
+  AssertTrue(Pos(#27']52;c;', Seq) = 1, 'prefix intact');
+end;
+
+procedure Test_CopyNoneReturnsFalse;
+var
+  Cb: TClipboard;
+begin
+  Cb.Method := cmNone;
+  Cb.ExternalTool := '';
+  AssertFalse(Cb.Copy('test'), 'Copy with cmNone returns False');
+end;
+
+procedure Test_PasteNoneReturnsEmpty;
+var
+  Cb: TClipboard;
+begin
+  Cb.Method := cmNone;
+  Cb.ExternalTool := '';
+  AssertEqStr('', Cb.Paste, 'Paste with cmNone returns empty');
+end;
+
 procedure RegisterClipboardTests;
 begin
   RegisterTest('clipboard / detect returns valid method', @Test_DetectReturnsValidMethod);
@@ -105,6 +146,10 @@ begin
   RegisterTest('clipboard / osc52 empty string',         @Test_OSC52EmptyString);
   RegisterTest('clipboard / osc52 long string',          @Test_OSC52LongString);
   RegisterTest('clipboard / osc52 base64 padding',       @Test_OSC52Base64Padding);
+  RegisterTest('clipboard / osc52 utf8 content',         @Test_OSC52Utf8Content);
+  RegisterTest('clipboard / osc52 newline in content',   @Test_OSC52NewlineInContent);
+  RegisterTest('clipboard / copy none returns false',    @Test_CopyNoneReturnsFalse);
+  RegisterTest('clipboard / paste none returns empty',   @Test_PasteNoneReturnsEmpty);
 end;
 
 end.

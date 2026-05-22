@@ -283,6 +283,42 @@ begin
   end;
 end;
 
+procedure Test_MultipleFramesRenderSequence;
+var App: TTestApp;
+begin
+  App := TTestApp.Create([KeyCharEvent(Ord('a'), []), KeyCharEvent(Ord('b'), []), KeyCharEvent(Ord('c'), [kmCtrl])]);
+  try
+    App.Run;
+    AssertTrue(App.RenderCount >= 3, 'render called at least 3 times');
+  finally
+    App.Free;
+  end;
+end;
+
+procedure Test_ElapsedMsAfterRun;
+var App: TTestApp;
+begin
+  App := TTestApp.Create([NoneEvent, KeyCharEvent(Ord('c'), [kmCtrl])]);
+  try
+    App.Run;
+    AssertTrue(App.ElapsedMs >= 0, 'ElapsedMs non-negative after run');
+  finally
+    App.Free;
+  end;
+end;
+
+procedure Test_TickCountIncrements;
+var App: TTestApp;
+begin
+  App := TTestApp.Create([NoneEvent, NoneEvent, NoneEvent, KeyCharEvent(Ord('c'), [kmCtrl])]);
+  try
+    App.Run;
+    AssertTrue(App.TickCount_ >= 3, 'tick count >= 3 after 3 none events');
+  finally
+    App.Free;
+  end;
+end;
+
 procedure RegisterTests;
 begin
   RegisterTest('app / quit on ctrl+c', @Test_QuitOnCtrlC);
@@ -294,6 +330,9 @@ begin
   RegisterTest('app / focus enabled', @Test_FocusEnabled);
   RegisterTest('app / IsQuitEvent overridable', @Test_IsQuitEventOverridable);
   RegisterTest('app / init and destroy called', @Test_InitAndDestroyCalled);
+  RegisterTest('app / multiple frames render', @Test_MultipleFramesRenderSequence);
+  RegisterTest('app / elapsed ms after run', @Test_ElapsedMsAfterRun);
+  RegisterTest('app / tick count increments', @Test_TickCountIncrements);
 end;
 
 end.
