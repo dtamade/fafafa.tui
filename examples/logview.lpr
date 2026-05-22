@@ -1,9 +1,14 @@
 program logview;
 
 {$mode objfpc}{$H+}
+{$IFNDEF UNIX}
+begin
+  WriteLn('logview requires Unix (uses fpRead/fpOpen for non-blocking file tail)');
+end.
+{$ELSE}
 
 uses
-  SysUtils, BaseUnix,
+  SysUtils, {$IFDEF UNIX}BaseUnix,{$ENDIF}
   ftui_app,
   ftui_event,
   ftui_terminal,
@@ -352,3 +357,4 @@ begin
     App.Free;
   end;
 end.
+{$ENDIF}

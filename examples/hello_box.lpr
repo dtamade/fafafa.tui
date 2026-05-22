@@ -17,7 +17,7 @@ program hello_box;
 
 uses
   SysUtils,
-  BaseUnix,
+  {$IFDEF UNIX}BaseUnix,{$ENDIF}
   ftui_rect,
   ftui_color,
   ftui_modifier,
