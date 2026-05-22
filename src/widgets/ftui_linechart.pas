@@ -18,6 +18,7 @@ interface
 
 uses
   SysUtils,
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -243,8 +244,8 @@ begin
     for SI := 0 to High(Series) do
     begin
       if LegendX >= Inner.X + Inner.Width then Break;
-      ABuf.SetStringN(LegendX, Inner.Y, Series[SI].Name, Length(Series[SI].Name), Series[SI].Style);
-      Inc(LegendX, Length(Series[SI].Name) + 2);
+      ABuf.SetStringN(LegendX, Inner.Y, Series[SI].Name, GraphemeWidth(Series[SI].Name), Series[SI].Style);
+      Inc(LegendX, GraphemeWidth(Series[SI].Name) + 2);
     end;
   end;
 

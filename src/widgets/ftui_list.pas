@@ -36,6 +36,7 @@ unit ftui_list;
 interface
 
 uses
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -224,7 +225,7 @@ begin
   // is set.  Matches cli888 behaviour.
   GutterW := 0;
   if HasHighlightSymbol and State.HasSelection then
-    GutterW := Length(HighlightSymbol);
+    GutterW := GraphemeWidth(HighlightSymbol);
 
   ItemMaxW := Inner.Width - GutterW;
   if ItemMaxW < 0 then ItemMaxW := 0;

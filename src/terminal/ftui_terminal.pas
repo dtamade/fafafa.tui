@@ -320,11 +320,11 @@ begin
     FBackend.HideCursor;
   FBackend.Flush;
 
-  // Swap prev/curr — next frame paints onto the old prev (cheap),
-  // and the now-old curr becomes the reference for the diff.
+  // Swap prev/merged — FPrev must hold what the terminal actually shows
+  // (the merged result), so next frame's diff is against the true screen state.
   Tmp := FPrev;
-  FPrev := FCurr;
-  FCurr := Tmp;
+  FPrev := FMerged;
+  FMerged := Tmp;
 end;
 
 procedure TTerminal.RequestQuit;
