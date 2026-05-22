@@ -66,12 +66,11 @@ end;
 
 function PlatformRead(Fd: TPlatformFd; Buf: PByte; Count: Integer): Integer;
 var
-  hIn: THandle;
   BytesRead: DWORD;
 begin
-  hIn := GetStdHandle(STD_INPUT_HANDLE);
+  if Fd = TPlatformFd(INVALID_HANDLE_VALUE) then Exit(-1);
   BytesRead := 0;
-  if ReadFile(hIn, Buf^, DWORD(Count), BytesRead, nil) then
+  if ReadFile(Fd, Buf^, DWORD(Count), BytesRead, nil) then
     Result := Integer(BytesRead)
   else
     Result := -1;
@@ -79,16 +78,15 @@ end;
 
 function PlatformWrite(Fd: TPlatformFd; Buf: PByte; Count: Integer): Boolean;
 var
-  hOut: THandle;
   Written: DWORD;
   Sent: Integer;
 begin
-  hOut := GetStdHandle(STD_OUTPUT_HANDLE);
+  if Fd = TPlatformFd(INVALID_HANDLE_VALUE) then Exit(False);
   Sent := 0;
   while Sent < Count do
   begin
     Written := 0;
-    if not WriteFile(hOut, (Buf + Sent)^, DWORD(Count - Sent), Written, nil) then
+    if not WriteFile(Fd, (Buf + Sent)^, DWORD(Count - Sent), Written, nil) then
       Exit(False);
     if Written = 0 then Exit(False);
     Inc(Sent, Integer(Written));
