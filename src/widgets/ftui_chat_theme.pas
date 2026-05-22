@@ -1,4 +1,4 @@
-unit ftui_theme;
+unit ftui_chat_theme;
 
 // Theme record — a flat collection of named colors matching the
 // cli888 TuiTheme structure.  Consumers pick colors by semantic name

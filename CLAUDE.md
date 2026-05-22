@@ -64,7 +64,7 @@ ftui_terminal  TTerminal / TFrame + ANSI backend + TestBackend + 输入解析
 
 整个渲染链路**禁止字符串拼接**。所有热路径数据：
 
-- `TCell` 是 `packed record`（栈内联 24 字节 glyph + style + width + skip flag）
+- `TCell` 是 `packed record`（栈内联 24 字节 glyph + 12 字节 style + width + skip = 40 字节）
 - `TBuffer.FContent` 是 `array of TCell`（连续数组，按 `y * width + x` 索引）
 - ANSI 输出走 `TByteBuilder`（`array of Byte` append-only），最后一次 `fpwrite` 给 stdout
 - 整数转 ASCII 用 itoa-style 直接写字节，**绝不用 IntToStr**
@@ -104,7 +104,7 @@ ratatui 的 `StatefulWidget<State=T>` 翻译为：widget 类的 Render 方法多
 
 基类 `EFtuiError`，子类按场景分（`EFtuiBufferError` / `EFtuiLayoutError` / `EFtuiBackendError`）。
 
-错误信息要带上下文，让消费方不读源码就能定位。但**热路径绝不靠异常控制流**——`Buffer.CellAt(x, y)` 越界一律 assert，不抛异常。
+错误信息要带上下文，让消费方不读源码就能定位。但**热路径绝不靠异常控制流**——`Buffer.CellAt(x, y)` 越界返回 nil，调用方检查后使用。
 
 ### 5. 测试基础设施先于代码
 

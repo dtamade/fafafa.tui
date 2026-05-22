@@ -15,6 +15,7 @@ UNIT_DIRS := \
 	$(SRC_DIR)/backend \
 	$(SRC_DIR)/terminal \
 	$(SRC_DIR)/input \
+	$(SRC_DIR)/app \
 	$(TESTS_DIR)
 
 FPC_BASE_FLAGS := -MObjFPC -Sh -O3 -gl -CR -Xs
