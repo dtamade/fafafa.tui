@@ -194,6 +194,36 @@ begin
   Buf.Free;
 end;
 
+procedure Test_CJKInsertAndMove;
+var S: TInputState;
+begin
+  S := TInputState.Empty;
+  S.InsertChar($4F60);  // 你 (3 bytes, width 2)
+  S.InsertChar($597D);  // 好 (3 bytes, width 2)
+  AssertEqInt(6, S.Cursor, 'cjk: cursor at end (6 bytes)');
+  AssertEqInt(4, S.TextWidth, 'cjk: text width 4 cols');
+  AssertEqInt(4, S.CursorCol, 'cjk: cursor col 4');
+  S.MoveLeft;
+  AssertEqInt(3, S.Cursor, 'cjk: move left to byte 3');
+  AssertEqInt(2, S.CursorCol, 'cjk: cursor col 2 after move left');
+  S.DeleteBack;
+  AssertEqInt(0, S.Cursor, 'cjk: cursor at 0 after delete');
+end;
+
+procedure Test_CJKMask;
+var S: TInputState; Inp: TInput; Buf: TBuffer;
+begin
+  S := TInputState.Empty;
+  S.InsertChar($4F60);
+  S.InsertChar($597D);
+  S.InsertChar(Ord('!'));
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 20, 1));
+  Inp := TInput.Default.WithMask('*');
+  Inp.RenderStateful(TRect.Make(0, 0, 20, 1), Buf, S);
+  AssertTrue(Pos('***', Buf.RowAsString(0)) > 0, 'mask: 3 graphemes = 3 asterisks');
+  Buf.Free;
+end;
+
 procedure RegisterInputTests;
 begin
   RegisterTest('input / empty state',        @Test_EmptyState);
@@ -209,6 +239,8 @@ begin
   RegisterTest('input / render mask',        @Test_RenderMask);
   RegisterTest('input / cursor highlight',   @Test_CursorHighlight);
   RegisterTest('input / scroll long text',   @Test_ScrollOnLongText);
+  RegisterTest('input / CJK insert+move',   @Test_CJKInsertAndMove);
+  RegisterTest('input / CJK mask',          @Test_CJKMask);
 end;
 
 end.

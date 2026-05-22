@@ -206,12 +206,12 @@ procedure WrapOneLine(SrcIdx: Integer; const FlatBuf: AnsiString;
 var
   P, Total, LineStart, LineEnd: Integer;
   LastSpace: Integer;
-  Ch: Byte;
+  ColAcc: Integer;
+  Adv: TGraphemeAdvance;
 begin
   Total := Length(FlatBuf);
   if Total = 0 then
   begin
-    // Empty source line still produces one empty visual line.
     if OutCount < Length(Out_) then
     begin
       Out_[OutCount].SrcLine := SrcIdx;
@@ -234,11 +234,14 @@ begin
 
     LineStart := P;
     LastSpace := -1;
-    while (P < Total) and (P - LineStart < Width) do
+    ColAcc := 0;
+    while P < Total do
     begin
-      Ch := Byte(FlatBuf[P + 1]);
-      if Ch = Ord(' ') then LastSpace := P;
-      Inc(P);
+      Adv := GraphemeAdvance(FlatBuf[1], Total, P);
+      if ColAcc + Adv.Width > Width then Break;
+      if Byte(FlatBuf[P + 1]) = Ord(' ') then LastSpace := P;
+      Inc(ColAcc, Adv.Width);
+      Inc(P, Adv.ByteLen);
     end;
 
     if P >= Total then
@@ -247,13 +250,11 @@ begin
     end
     else if (LastSpace > LineStart) then
     begin
-      // Break at the last whitespace within this window.
       LineEnd := LastSpace;
-      P := LastSpace + 1;            // skip the space
+      P := LastSpace + 1;
     end
     else
     begin
-      // Single word wider than Width — hard break at the column edge.
       LineEnd := P;
     end;
 
@@ -387,6 +388,9 @@ begin
 
       // Decode one grapheme
       Adv := GraphemeAdvance(FlatBufs[SrcLine][1], Length(FlatBufs[SrcLine]), J);
+
+      // Wide char overflow check
+      if X + Adv.Width > Inner.X + Inner.Width then Break;
 
       // Determine span style (cache: only recompute when span changes)
       ByteIdx := J;

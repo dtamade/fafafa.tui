@@ -111,6 +111,20 @@ begin
   end;
 end;
 
+function GraphemeCountUpTo(const S: AnsiString; BytePos: Integer): Integer;
+var P: Integer; Adv: TGraphemeAdvance;
+begin
+  Result := 0;
+  P := 0;
+  while P < BytePos do
+  begin
+    if P >= Length(S) then Break;
+    Adv := GraphemeAdvance(S[1], Length(S), P);
+    Inc(P, Adv.ByteLen);
+    Inc(Result);
+  end;
+end;
+
 function ColWidthUpTo(const S: AnsiString; BytePos: Integer): Integer;
 var P: Integer; Adv: TGraphemeAdvance;
 begin
@@ -144,7 +158,7 @@ end;
 procedure TInputState.InsertChar(Cp: LongWord);
 var S: AnsiString;
 begin
-  if Cp < 32 then Exit;
+  if (Cp < 32) or (Cp > $10FFFF) then Exit;
   S := Ucs4ToUtf8(Cp);
   Insert(S, Text, Cursor + 1);
   Inc(Cursor, Length(S));
@@ -292,45 +306,66 @@ begin
 
   VisibleW := Inner.Width;
 
-  // Build display text (masked or raw)
+  // Build display text and map cursor/scroll to display coordinates
   if MaskChar <> #0 then
-    DisplayText := StringOfChar(MaskChar, GraphemeCount(State.Text))
+  begin
+    DisplayText := StringOfChar(MaskChar, GraphemeCount(State.Text));
+    // In mask mode, cursor position = grapheme index (each mask char is 1 col)
+    CursorCol := GraphemeCountUpTo(State.Text, State.Cursor);
+    ScrollCol := GraphemeCountUpTo(State.Text, State.ScrollX);
+  end
   else
+  begin
     DisplayText := State.Text;
-
-  // Calculate cursor column position (display width from ScrollX to Cursor)
-  CursorCol := ColWidthUpTo(DisplayText, State.Cursor);
-  ScrollCol := ColWidthUpTo(DisplayText, State.ScrollX);
+    CursorCol := ColWidthUpTo(DisplayText, State.Cursor);
+    ScrollCol := ColWidthUpTo(DisplayText, State.ScrollX);
+  end;
 
   // Adjust ScrollX so cursor is visible (using column widths)
   if CursorCol < ScrollCol then
-    State.ScrollX := State.Cursor
+  begin
+    State.ScrollX := State.Cursor;
+    ScrollCol := CursorCol;
+  end
   else if CursorCol - ScrollCol >= VisibleW then
   begin
-    // Move ScrollX forward until cursor fits
     P := State.Cursor;
     Col := 0;
     while (P > 0) and (Col < VisibleW - 1) do
     begin
-      P := PrevGraphemeByte(DisplayText, P);
-      Adv := GraphemeAdvance(DisplayText[1], Length(DisplayText), P);
+      P := PrevGraphemeByte(State.Text, P);
+      Adv := GraphemeAdvance(State.Text[1], Length(State.Text), P);
       Inc(Col, Adv.Width);
+      if MaskChar <> #0 then Col := Col - Adv.Width + 1;
     end;
     State.ScrollX := P;
+    if MaskChar <> #0 then
+      ScrollCol := GraphemeCountUpTo(State.Text, State.ScrollX)
+    else
+      ScrollCol := ColWidthUpTo(DisplayText, State.ScrollX);
   end;
-  if State.ScrollX < 0 then State.ScrollX := 0;
+  if State.ScrollX < 0 then
+  begin
+    State.ScrollX := 0;
+    ScrollCol := 0;
+  end;
 
   // Render text or placeholder
   if (Length(DisplayText) = 0) and (Length(Placeholder) > 0) then
     ABuf.SetStringN(Inner.X, Inner.Y, Placeholder, VisibleW, PlaceholderStyle)
   else if Length(DisplayText) > 0 then
-    ABuf.SetStringN(Inner.X, Inner.Y,
-      Copy(DisplayText, State.ScrollX + 1, Length(DisplayText) - State.ScrollX),
-      VisibleW, Style);
+  begin
+    if MaskChar <> #0 then
+      ABuf.SetStringN(Inner.X, Inner.Y,
+        Copy(DisplayText, ScrollCol + 1, Length(DisplayText) - ScrollCol),
+        VisibleW, Style)
+    else
+      ABuf.SetStringN(Inner.X, Inner.Y,
+        Copy(DisplayText, State.ScrollX + 1, Length(DisplayText) - State.ScrollX),
+        VisibleW, Style);
+  end;
 
   // Cursor highlight (at correct column position)
-  CursorCol := ColWidthUpTo(DisplayText, State.Cursor);
-  ScrollCol := ColWidthUpTo(DisplayText, State.ScrollX);
   Col := CursorCol - ScrollCol;
   if (Col >= 0) and (Col < VisibleW) then
     ABuf.SetStyle(TRect.Make(Inner.X + Col, Inner.Y, 1, 1), CursorStyle);
