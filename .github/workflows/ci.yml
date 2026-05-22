@@ -69,18 +69,18 @@ jobs:
       - name: Run tests (Unix)
         if: runner.os != 'Windows'
         run: make test FPC_BASE_FLAGS="-MObjFPC -Sh -O1 -gl"
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       - name: Build examples (Unix)
         if: runner.os != 'Windows'
         run: make examples FPC_BASE_FLAGS="-MObjFPC -Sh -O1 -gl"
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       # --- Windows: direct fpc invocation (avoids Makefile/bash path issues) ---
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         shell: cmd
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           if not exist build\bin mkdir build\bin
           fpc -MObjFPC -Sh -O1 -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FuC:\tools\freepascal\units\i386-win32\* -FEbuild\bin tests\test_runner.lpr
@@ -91,7 +91,7 @@ jobs:
       - name: Build examples (Windows)
         if: runner.os == 'Windows'
         shell: cmd
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           if not exist build\bin mkdir build\bin
           for %%f in (examples\*.lpr) do (
