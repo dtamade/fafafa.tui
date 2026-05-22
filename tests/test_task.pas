@@ -316,11 +316,13 @@ end;
 
 procedure RegisterTaskTests;
 begin
+  {$IF FPC_FULLVERSION >= 30300}
   RegisterTest('task / Spawn and Poll',        @Test_SpawnAndPoll);
   RegisterTest('task / Param copy safety',     @Test_ParamCopy);
   RegisterTest('task / Cancel',                @Test_Cancel);
   RegisterTest('task / Exception propagation', @Test_ExceptionPropagation);
   RegisterTest('task / DrainCompleted batch',  @Test_DrainCompleted);
+  {$ENDIF}
   RegisterTest('task / LoadingGroup phases',   @Test_LoadingGroupPhases);
   RegisterTest('task / LoadingGroup error',    @Test_LoadingGroupError);
   RegisterTest('task / LoadingGroup multi',    @Test_LoadingGroupMultiSlot);
