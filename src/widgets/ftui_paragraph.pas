@@ -54,6 +54,7 @@ uses
   ftui_style,
   ftui_cell,
   ftui_buffer,
+  ftui_grapheme,
   ftui_text,
   ftui_block;
 
@@ -275,12 +276,12 @@ var
   Wrapped: array of TWrappedLine;
   FlatBufs: array of AnsiString;
   SpanIdxArrays: array of TByteSpanIdx;
-  LineW, OffsetX, X, ByteIdx, SpanIdx: Integer;
+  LineW, OffsetX, X, ByteIdx, SpanIdx, NewSpanIdx: Integer;
   RowY: Integer;
   S: TStyle;
   SrcLine: Integer;
   WL: TWrappedLine;
-  Glyph: AnsiString;
+  Adv: TGraphemeAdvance;
   CP: PCell;
 begin
   Clip := ABuf.Area.Intersection(Area);
@@ -299,6 +300,7 @@ begin
     Inner := Clip;
 
   if Inner.IsEmpty then Exit;
+  if Inner.Width = 0 then Exit;
   ABuf.SetStyle(Inner, Style);
 
   // 3. Default alignment cascade.
@@ -368,40 +370,49 @@ begin
     WL := Wrapped[I];
     SrcLine := WL.SrcLine;
 
-    LineW := WL.ByteEnd - WL.ByteStart;
+    // Calculate display width of this wrapped line
+    LineW := GraphemeWidth(Copy(FlatBufs[SrcLine], WL.ByteStart + 1, WL.ByteEnd - WL.ByteStart));
     if LineW > Inner.Width then LineW := Inner.Width;
     OffsetX := GetLineOffset(LineW, Inner.Width, WL.Alignment);
 
-    // Walk bytes inside [ByteStart, ByteEnd), placing each into the
-    // matching cell with the matching span's style patched on.
+    // Walk graphemes inside [ByteStart, ByteEnd), placing each into
+    // the matching cell with the correct width and style.
     X := Inner.X + OffsetX;
-    for J := WL.ByteStart to WL.ByteEnd - 1 do
+    J := WL.ByteStart;
+    SpanIdx := -1;
+    S := TStyle.Default;
+    while J < WL.ByteEnd do
     begin
       if X >= Inner.X + Inner.Width then Break;
+
+      // Decode one grapheme
+      Adv := GraphemeAdvance(FlatBufs[SrcLine][1], Length(FlatBufs[SrcLine]), J);
+
+      // Determine span style (cache: only recompute when span changes)
       ByteIdx := J;
       if (ByteIdx >= 0) and (ByteIdx < Length(SpanIdxArrays[SrcLine])) then
-        SpanIdx := SpanIdxArrays[SrcLine][ByteIdx]
+        NewSpanIdx := SpanIdxArrays[SrcLine][ByteIdx]
       else
-        SpanIdx := 0;
+        NewSpanIdx := 0;
+      if NewSpanIdx <> SpanIdx then
+      begin
+        SpanIdx := NewSpanIdx;
+        S := Style.Patch(Text.Style);
+        if SrcLine < Length(Text.Lines) then
+          S := S.Patch(Text.Lines[SrcLine].Style);
+        if (SpanIdx >= 0) and (SpanIdx < Length(Text.Lines[SrcLine].Spans)) then
+          S := S.Patch(Text.Lines[SrcLine].Spans[SpanIdx].Style);
+      end;
 
       CP := ABuf.CellAt(X, RowY);
       if CP <> nil then
       begin
-        // Copy 1 ASCII byte into the cell (M1 limitation; M2 utf8proc
-        // would split graphemes here).
-        Glyph := Copy(FlatBufs[SrcLine], J + 1, 1);
-        if Length(Glyph) > 0 then
-          CellSetSymbolBytes(CP^, Glyph[1], 1, 1);
-        // Style precedence: self.style -> Text.style -> Line.style ->
-        // Span.style.  Build it bottom-up by Patching.
-        S := Style;
-        if SrcLine >= 0 then
-          S := S.Patch(Text.Style).Patch(Text.Lines[SrcLine].Style);
-        if (SpanIdx >= 0) and (SpanIdx < Length(Text.Lines[SrcLine].Spans)) then
-          S := S.Patch(Text.Lines[SrcLine].Spans[SpanIdx].Style);
+        CellSetSymbolBytes(CP^, FlatBufs[SrcLine][J + 1], Adv.ByteLen, Adv.Width);
         CellApplyStyle(CP^, S);
       end;
-      Inc(X);
+
+      Inc(X, Adv.Width);
+      Inc(J, Adv.ByteLen);
     end;
 
     Inc(Y);

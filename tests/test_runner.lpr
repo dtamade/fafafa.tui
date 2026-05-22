@@ -82,7 +82,8 @@ uses
   test_select,
   test_modal,
   test_format,
-  test_terminal;
+  test_terminal,
+  test_panel;
 
 var
   Failed: Integer;
@@ -160,6 +161,7 @@ begin
   test_modal.RegisterTests;
   RegisterFormatTests;
   RegisterTerminalTests;
+  RegisterPanelTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

@@ -46,7 +46,7 @@ type
 implementation
 
 uses
-  SysUtils;
+  SysUtils, ftui_grapheme;
 
 class function TTimelineEvent.Make(const ATime, ATitle: AnsiString): TTimelineEvent;
 begin
@@ -109,8 +109,8 @@ begin
   // Layout: [time] [node] [title/desc]
   TimeW := 0;
   for I := 0 to High(Events) do
-    if Length(Events[I].Time) > TimeW then
-      TimeW := Length(Events[I].Time);
+    if GraphemeWidth(Events[I].Time) > TimeW then
+      TimeW := GraphemeWidth(Events[I].Time);
   Inc(TimeW); // space
 
   NodeX := Inner.X + TimeW;

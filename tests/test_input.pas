@@ -38,9 +38,9 @@ procedure Test_InsertChar;
 var S: TInputState;
 begin
   S := TInputState.Empty;
-  S.InsertChar('a');
-  S.InsertChar('b');
-  S.InsertChar('c');
+  S.InsertChar(Ord('a'));
+  S.InsertChar(Ord('b'));
+  S.InsertChar(Ord('c'));
   AssertEqStr('abc', S.Text, 'inserted abc');
   AssertEqInt(3, S.Cursor, 'cursor at 3');
 end;
@@ -50,7 +50,7 @@ var S: TInputState;
 begin
   S := TInputState.WithText('ac');
   S.Cursor := 1;
-  S.InsertChar('b');
+  S.InsertChar(Ord('b'));
   AssertEqStr('abc', S.Text, 'insert in middle');
   AssertEqInt(2, S.Cursor, 'cursor after insert');
 end;

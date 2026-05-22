@@ -46,6 +46,7 @@ run_bench "bench_layout" "5" "us" "(?<=per-call:     )[0-9.]+"
 run_bench "bench_input" "1000" "ns" "(?<=per-event:       )[0-9.]+"
 run_bench "bench_render" "1000" "us" "(?<=per-frame:       )[0-9.]+"
 run_bench "bench_mouse_move" "500" "us" "(?<=per-event:       )[0-9.]+"
+run_bench "bench_fullscreen" "2000" "us" "(?<=per frame: )[0-9.]+"
 
 echo ""
 echo "--- CJK comparison ---"

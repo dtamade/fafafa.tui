@@ -231,7 +231,7 @@ begin
       mlHRule:
       begin
         ABuf.SetStringN(Inner.X, Y,
-          Copy(StringOfChar('-', Inner.Width), 1, Inner.Width), Inner.Width, Theme.HRule);
+          StringOfChar('-', Inner.Width), Inner.Width, Theme.HRule);
       end;
     else
       ABuf.SetStringN(Inner.X, Y, Lines[I].Text, Inner.Width, Theme.Normal);

@@ -144,6 +144,12 @@ begin
 
   ViewH := Inner.Height;
 
+  // Clamp state
+  if State.TotalItems <= 0 then Exit;
+  if State.Selected >= State.TotalItems then
+    State.Selected := State.TotalItems - 1;
+  if State.Selected < 0 then State.Selected := 0;
+
   // Ensure selected is visible
   if State.Selected < State.Offset then
     State.Offset := State.Selected;
@@ -166,6 +172,12 @@ begin
   TextW := Inner.Width - GutterW;
   if TextW < 1 then TextW := 1;
 
+  if ShowIndex then
+  begin
+    SetLength(IdxStr, GutterW);
+    for J := 1 to GutterW do IdxStr[J] := ' ';
+  end;
+
   for I := 0 to ViewH - 1 do
   begin
     Row := State.Offset + I;
@@ -186,10 +198,8 @@ begin
         V := V div 10;
         Inc(IdxLen);
       until V = 0;
-      // Right-align into IdxStr (reuse pre-allocated length)
-      SetLength(IdxStr, GutterW);
       for J := 1 to GutterW do IdxStr[J] := ' ';
-      D := GutterW - 1; // last char before trailing space
+      D := GutterW - 1;
       for J := 0 to IdxLen - 1 do
       begin
         IdxStr[D] := Chr(IdxBuf[J]);

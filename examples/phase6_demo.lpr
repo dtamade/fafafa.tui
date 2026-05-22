@@ -145,7 +145,7 @@ begin
         Ord('l'): CalState.NextMonth;
         Ord('j'): CalState.NextDay;
         Ord('k'): CalState.PrevDay;
-        else InputState.InsertChar(Chr(K.Ch));
+        else InputState.InsertChar(K.Ch);
       end;
     kcBackspace: InputState.DeleteBack;
     kcDelete: InputState.DeleteForward;

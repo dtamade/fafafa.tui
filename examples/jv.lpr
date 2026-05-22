@@ -473,7 +473,7 @@ begin
       kcBackspace:
         FSearchState.DeleteBack;
       kcChar:
-        FSearchState.InsertChar(Chr(Ev.Key.Ch));
+        FSearchState.InsertChar(Ev.Key.Ch);
     end;
     Exit;
   end;

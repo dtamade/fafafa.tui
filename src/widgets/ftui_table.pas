@@ -8,6 +8,7 @@ unit ftui_table;
 interface
 
 uses
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -191,7 +192,7 @@ procedure AlignedWrite(ABuf: TBuffer; X, Y, ColW: Integer;
 var TW, Pad: Integer;
 begin
   if ColW <= 0 then Exit;
-  TW := System.Length(Text);
+  TW := GraphemeWidth(Text);
   if TW > ColW then TW := ColW;
   case Align of
     caLeft:   Pad := 0;

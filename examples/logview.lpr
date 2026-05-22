@@ -300,7 +300,7 @@ begin
       kcBackspace:
         FFilterState.DeleteBack;
       kcChar:
-        FFilterState.InsertChar(Chr(Ev.Key.Ch));
+        FFilterState.InsertChar(Ev.Key.Ch);
     end;
     Exit;
   end;

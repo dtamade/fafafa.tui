@@ -38,7 +38,7 @@ type
 implementation
 
 uses
-  SysUtils;
+  SysUtils, ftui_grapheme;
 
 class function TTooltip.Create(const AText: AnsiString): TTooltip;
 begin
@@ -68,7 +68,7 @@ var
 begin
   if Length(Text) = 0 then Exit;
 
-  TipW := Length(Text) + 2; // +2 for border
+  TipW := GraphemeWidth(Text) + 2;
   if TipW > MaxWidth then TipW := MaxWidth;
   TipH := 3; // border + text + border
 

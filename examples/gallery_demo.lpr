@@ -229,7 +229,7 @@ begin
       end;
     kcChar:
       case FTabState.Selected of
-        3: FInputState.InsertChar(Chr(Ev.Key.Ch));
+        3: FInputState.InsertChar(Ev.Key.Ch);
       end;
     kcBackspace:
       case FTabState.Selected of

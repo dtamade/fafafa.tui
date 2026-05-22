@@ -79,6 +79,9 @@ function FillConstraint(Weight: Word): TConstraint; inline;
 function HorizontalSplit(const Area: TRect; const Cs: array of TConstraint): TRectArray;
 function VerticalSplit  (const Area: TRect; const Cs: array of TConstraint): TRectArray;
 
+function ComputeSlotSizes(Total: Integer;
+  const Cs: array of TConstraint): TIntArray;
+
 implementation
 
 function LengthConstraint(N: Word): TConstraint;

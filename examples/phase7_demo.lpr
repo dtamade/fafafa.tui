@@ -145,7 +145,7 @@ begin
       kcEsc: CPState.Close;
       kcUp: CPState.SelectPrev;
       kcDown: CPState.SelectNext;
-      kcChar: CPState.Input.InsertChar(Chr(K.Ch));
+      kcChar: CPState.Input.InsertChar(K.Ch);
       kcBackspace: CPState.Input.DeleteBack;
       kcEnter: CPState.Close;
     else end;

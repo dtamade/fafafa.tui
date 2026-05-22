@@ -8,6 +8,7 @@ unit ftui_dialog;
 interface
 
 uses
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -189,7 +190,7 @@ begin
   begin
     TotalBtnW := 0;
     for I := 0 to High(Buttons) do
-      Inc(TotalBtnW, Length(Buttons[I].Label_) + 4);
+      Inc(TotalBtnW, GraphemeWidth(Buttons[I].Label_) + 4);
     Spacing := 2;
     Inc(TotalBtnW, (Length(Buttons) - 1) * Spacing);
 
@@ -204,7 +205,7 @@ begin
         Sty := ButtonStyle;
 
       BtnText := '[ ' + Buttons[I].Label_ + ' ]';
-      BtnW := Length(BtnText);
+      BtnW := GraphemeWidth(BtnText);
       ABuf.SetStringN(BtnX, ButtonArea.Y, BtnText, BtnW, Sty);
       Inc(BtnX, BtnW + Spacing);
     end;

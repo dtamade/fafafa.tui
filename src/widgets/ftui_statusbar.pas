@@ -8,6 +8,7 @@ unit ftui_statusbar;
 interface
 
 uses
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -108,26 +109,26 @@ begin
   begin
     if X >= Area.X + W then Break;
     ABuf.SetStringN(X, Area.Y, Left[I].Text, W - (X - Area.X), Style.Patch(Left[I].Style));
-    Inc(X, Length(Left[I].Text));
+    Inc(X, GraphemeWidth(Left[I].Text));
   end;
 
   // Right segments (render from right edge)
   TotalRight := 0;
   for I := 0 to High(Right) do
-    Inc(TotalRight, Length(Right[I].Text));
+    Inc(TotalRight, GraphemeWidth(Right[I].Text));
   X := Area.X + W - TotalRight;
   if X < Area.X then X := Area.X;
   for I := 0 to High(Right) do
   begin
     if X >= Area.X + W then Break;
     ABuf.SetStringN(X, Area.Y, Right[I].Text, W - (X - Area.X), Style.Patch(Right[I].Style));
-    Inc(X, Length(Right[I].Text));
+    Inc(X, GraphemeWidth(Right[I].Text));
   end;
 
   // Center segments
   TotalCenter := 0;
   for I := 0 to High(Center) do
-    Inc(TotalCenter, Length(Center[I].Text));
+    Inc(TotalCenter, GraphemeWidth(Center[I].Text));
   CenterStart := Area.X + (W - TotalCenter) div 2;
   if CenterStart < Area.X then CenterStart := Area.X;
   X := CenterStart;
@@ -135,7 +136,7 @@ begin
   begin
     if X >= Area.X + W then Break;
     ABuf.SetStringN(X, Area.Y, Center[I].Text, W - (X - Area.X), Style.Patch(Center[I].Style));
-    Inc(X, Length(Center[I].Text));
+    Inc(X, GraphemeWidth(Center[I].Text));
   end;
 end;
 

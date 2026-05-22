@@ -376,7 +376,7 @@ begin
     CurrRow := CurrBase + (Row * W);
 
     if (Invalidated = 0) and (ToSkip = 0) and
-       CompareMem(PrevRow, CurrRow, RowBytes) then
+       (CompareByte(PrevRow^, CurrRow^, RowBytes) = 0) then
       Continue;
 
     PosY := FArea.Y + Row;
@@ -479,7 +479,7 @@ begin
     CurrRow := CurrBase + (Row * W);
 
     if (Invalidated = 0) and (ToSkip = 0) and
-       CompareMem(PrevRow, CurrRow, RowBytes) then
+       (CompareByte(PrevRow^, CurrRow^, RowBytes) = 0) then
       Continue;
 
     PosY := FArea.Y + Row;

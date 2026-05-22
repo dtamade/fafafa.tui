@@ -18,7 +18,7 @@ type
   TBorderSide = (bsTop, bsRight, bsBottom, bsLeft);
   TBorders = set of TBorderSide;
 
-  // A set of 8 glyphs defining the visual appearance of a border.
+  // A set of 11 glyphs defining the visual appearance of a border.
   TBorderSet = record
     Horizontal: AnsiString;
     Vertical: AnsiString;
@@ -26,9 +26,11 @@ type
     TopRight: AnsiString;
     BottomLeft: AnsiString;
     BottomRight: AnsiString;
-    // Connectors for internal separators (├ ┤ style).
     LeftT: AnsiString;
     RightT: AnsiString;
+    TopT: AnsiString;
+    BottomT: AnsiString;
+    Cross: AnsiString;
   end;
 
 const
@@ -52,11 +54,46 @@ const
   // Connector glyphs for internal separators.
   BorderLeftT:      AnsiString = #$E2#$94#$9C;   // ├
   BorderRightT:     AnsiString = #$E2#$94#$A4;   // ┤
+  BorderTopT:       AnsiString = #$E2#$94#$AC;   // ┬
+  BorderBottomT:    AnsiString = #$E2#$94#$B4;   // ┴
+  BorderCross:      AnsiString = #$E2#$94#$BC;   // ┼
+
+  // Double line glyphs.
+  BorderDoubleH:    AnsiString = #$E2#$95#$90;   // ═
+  BorderDoubleV:    AnsiString = #$E2#$95#$91;   // ║
+  BorderDoubleTL:   AnsiString = #$E2#$95#$94;   // ╔
+  BorderDoubleTR:   AnsiString = #$E2#$95#$97;   // ╗
+  BorderDoubleBL:   AnsiString = #$E2#$95#$9A;   // ╚
+  BorderDoubleBR:   AnsiString = #$E2#$95#$9D;   // ╝
+  BorderDoubleLT:   AnsiString = #$E2#$95#$A0;   // ╠
+  BorderDoubleRT:   AnsiString = #$E2#$95#$A3;   // ╣
+  BorderDoubleTT:   AnsiString = #$E2#$95#$A6;   // ╦
+  BorderDoubleBT:   AnsiString = #$E2#$95#$A9;   // ╩
+  BorderDoubleCross:AnsiString = #$E2#$95#$AC;   // ╬
+
+  // Heavy line glyphs.
+  BorderHeavyH:     AnsiString = #$E2#$94#$81;   // ━
+  BorderHeavyV:     AnsiString = #$E2#$94#$83;   // ┃
+  BorderHeavyTL:    AnsiString = #$E2#$94#$8F;   // ┏
+  BorderHeavyTR:    AnsiString = #$E2#$94#$93;   // ┓
+  BorderHeavyBL:    AnsiString = #$E2#$94#$97;   // ┗
+  BorderHeavyBR:    AnsiString = #$E2#$94#$9B;   // ┛
+  BorderHeavyLT:    AnsiString = #$E2#$94#$A3;   // ┣
+  BorderHeavyRT:    AnsiString = #$E2#$94#$AB;   // ┫
+  BorderHeavyTT:    AnsiString = #$E2#$94#$B3;   // ┳
+  BorderHeavyBT:    AnsiString = #$E2#$94#$BB;   // ┻
+  BorderHeavyCross: AnsiString = #$E2#$95#$8B;   // ╋
+
+  // Dashed line glyphs.
+  BorderDashedH:    AnsiString = #$E2#$94#$84;   // ┄
+  BorderDashedV:    AnsiString = #$E2#$94#$86;   // ┆
 
 var
-  // Pre-built border sets for convenience.
   BorderSetPlain: TBorderSet;
   BorderSetRounded: TBorderSet;
+  BorderSetDouble: TBorderSet;
+  BorderSetHeavy: TBorderSet;
+  BorderSetDashed: TBorderSet;
 
 implementation
 
@@ -69,6 +106,9 @@ initialization
   BorderSetPlain.BottomRight := BorderBottomRight;
   BorderSetPlain.LeftT       := BorderLeftT;
   BorderSetPlain.RightT      := BorderRightT;
+  BorderSetPlain.TopT        := BorderTopT;
+  BorderSetPlain.BottomT     := BorderBottomT;
+  BorderSetPlain.Cross       := BorderCross;
 
   BorderSetRounded.Horizontal  := BorderHorizontal;
   BorderSetRounded.Vertical    := BorderVertical;
@@ -78,5 +118,44 @@ initialization
   BorderSetRounded.BottomRight := BorderRoundedBR;
   BorderSetRounded.LeftT       := BorderLeftT;
   BorderSetRounded.RightT      := BorderRightT;
+  BorderSetRounded.TopT        := BorderTopT;
+  BorderSetRounded.BottomT     := BorderBottomT;
+  BorderSetRounded.Cross       := BorderCross;
+
+  BorderSetDouble.Horizontal  := BorderDoubleH;
+  BorderSetDouble.Vertical    := BorderDoubleV;
+  BorderSetDouble.TopLeft     := BorderDoubleTL;
+  BorderSetDouble.TopRight    := BorderDoubleTR;
+  BorderSetDouble.BottomLeft  := BorderDoubleBL;
+  BorderSetDouble.BottomRight := BorderDoubleBR;
+  BorderSetDouble.LeftT       := BorderDoubleLT;
+  BorderSetDouble.RightT      := BorderDoubleRT;
+  BorderSetDouble.TopT        := BorderDoubleTT;
+  BorderSetDouble.BottomT     := BorderDoubleBT;
+  BorderSetDouble.Cross       := BorderDoubleCross;
+
+  BorderSetHeavy.Horizontal  := BorderHeavyH;
+  BorderSetHeavy.Vertical    := BorderHeavyV;
+  BorderSetHeavy.TopLeft     := BorderHeavyTL;
+  BorderSetHeavy.TopRight    := BorderHeavyTR;
+  BorderSetHeavy.BottomLeft  := BorderHeavyBL;
+  BorderSetHeavy.BottomRight := BorderHeavyBR;
+  BorderSetHeavy.LeftT       := BorderHeavyLT;
+  BorderSetHeavy.RightT      := BorderHeavyRT;
+  BorderSetHeavy.TopT        := BorderHeavyTT;
+  BorderSetHeavy.BottomT     := BorderHeavyBT;
+  BorderSetHeavy.Cross       := BorderHeavyCross;
+
+  BorderSetDashed.Horizontal  := BorderDashedH;
+  BorderSetDashed.Vertical    := BorderDashedV;
+  BorderSetDashed.TopLeft     := BorderTopLeft;
+  BorderSetDashed.TopRight    := BorderTopRight;
+  BorderSetDashed.BottomLeft  := BorderBottomLeft;
+  BorderSetDashed.BottomRight := BorderBottomRight;
+  BorderSetDashed.LeftT       := BorderLeftT;
+  BorderSetDashed.RightT      := BorderRightT;
+  BorderSetDashed.TopT        := BorderTopT;
+  BorderSetDashed.BottomT     := BorderBottomT;
+  BorderSetDashed.Cross       := BorderCross;
 
 end.

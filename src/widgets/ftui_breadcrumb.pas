@@ -37,7 +37,7 @@ type
 implementation
 
 uses
-  SysUtils;
+  SysUtils, ftui_grapheme;
 
 class function TBreadcrumb.Create(const AItems: array of AnsiString): TBreadcrumb;
 var I: Integer;
@@ -73,9 +73,9 @@ begin
   Result := 0;
   for I := 0 to High(Items) do
   begin
-    Inc(Result, Length(Items[I]));
+    Inc(Result, GraphemeWidth(Items[I]));
     if I < High(Items) then
-      Inc(Result, Length(Separator));
+      Inc(Result, GraphemeWidth(Separator));
   end;
 end;
 
@@ -97,12 +97,12 @@ begin
       ItemSty := Style;
 
     ABuf.SetStringN(X, Area.Y, Items[I], Area.X + Area.Width - X, ItemSty);
-    Inc(X, Length(Items[I]));
+    Inc(X, GraphemeWidth(Items[I]));
 
     if (I < High(Items)) and (X < Area.X + Area.Width) then
     begin
       ABuf.SetStringN(X, Area.Y, Separator, Area.X + Area.Width - X, SepStyle);
-      Inc(X, Length(Separator));
+      Inc(X, GraphemeWidth(Separator));
     end;
   end;
 end;

@@ -8,6 +8,7 @@ unit ftui_menu;
 interface
 
 uses
+  ftui_grapheme,
   ftui_rect,
   ftui_color,
   ftui_modifier,
@@ -202,10 +203,10 @@ begin
 
       if Items[I].Shortcut <> '' then
       begin
-        ShortcutX := Area.X + W - Length(Items[I].Shortcut) - 1;
+        ShortcutX := Area.X + W - GraphemeWidth(Items[I].Shortcut) - 1;
         if ShortcutX > Area.X + 1 then
           ABuf.SetStringN(ShortcutX, Y, Items[I].Shortcut,
-            Length(Items[I].Shortcut), Sty);
+            GraphemeWidth(Items[I].Shortcut), Sty);
       end;
 
       if Items[I].Kind = mikSubmenu then

@@ -81,6 +81,7 @@
 | `ftui_breadcrumb` | TBreadcrumb + WithActive/Render |
 | `ftui_command_palette` | TCommandPalette + TCommandPaletteState.Empty + RenderStateful |
 | `ftui_split_pane` | TSplitPane + RenderStateful |
+| `ftui_panel` | TPanel + TPanelGrid + PanelCell + Render/Layout |
 | `ftui_canvas` | TCanvas + Render |
 | `ftui_diffview` | TDiffView + TDiffViewState + FromUnifiedDiff/RenderStateful |
 | `ftui_file_tree` | TFileTree + TFileTreeState + RenderStateful |
