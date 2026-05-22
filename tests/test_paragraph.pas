@@ -231,6 +231,45 @@ begin
   end;
 end;
 
+procedure Test_CJKWrapPure;
+var P: TParagraph; Buf: TBuffer; Row1, Row2, Row3: AnsiString;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 4, 5));
+  P := TParagraph.FromString(#$E4#$BD#$A0#$E5#$A5#$BD#$E4#$B8#$96#$E7#$95#$8C#$E5#$86#$8D#$E8#$A7#$81)
+    .WithWrap(WrapTrim);
+  P.Render(TRect.Make(0, 0, 4, 5), Buf);
+  Row1 := Buf.RowAsString(0);
+  Row2 := Buf.RowAsString(1);
+  Row3 := Buf.RowAsString(2);
+  AssertTrue(Pos(#$E4#$BD#$A0, Row1) > 0, 'cjk wrap: row 0 has 你');
+  AssertTrue(Pos(#$E4#$B8#$96, Row2) > 0, 'cjk wrap: row 1 has 世');
+  AssertTrue(Pos(#$E5#$86#$8D, Row3) > 0, 'cjk wrap: row 2 has 再');
+end;
+
+procedure Test_CJKWrapMixed;
+var P: TParagraph; Buf: TBuffer; Row0, Row1: AnsiString;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 8, 3));
+  P := TParagraph.FromString('hello' + #$E4#$BD#$A0#$E5#$A5#$BD + 'world')
+    .WithWrap(WrapTrim);
+  P.Render(TRect.Make(0, 0, 8, 3), Buf);
+  Row0 := Buf.RowAsString(0);
+  Row1 := Buf.RowAsString(1);
+  AssertTrue(Pos('hello', Row0) > 0, 'mixed wrap: row 0 has hello');
+  AssertTrue(Length(Row1) > 0, 'mixed wrap: row 1 has content');
+end;
+
+procedure Test_CJKWidth1;
+var P: TParagraph; Buf: TBuffer;
+begin
+  Buf := TBuffer.CreateEmpty(TRect.Make(0, 0, 1, 3));
+  P := TParagraph.FromString(#$E4#$BD#$A0#$E5#$A5#$BD)
+    .WithWrap(WrapTrim);
+  P.Render(TRect.Make(0, 0, 1, 3), Buf);
+  AssertTrue(True, 'width=1 + CJK: no infinite loop');
+  Buf.Free;
+end;
+
 procedure RegisterParagraphTests;
 begin
   RegisterTest('paragraph / left aligned fits one line',     @Test_LeftAlignedFitsInOneLine);
@@ -244,6 +283,9 @@ begin
   RegisterTest('paragraph / inside block',                   @Test_ParagraphInsideBlock);
   RegisterTest('paragraph / per-line alignment overrides',   @Test_PerLineAlignmentOverridesParagraph);
   RegisterTest('paragraph / style.bg fills area',            @Test_StyleBgFillsArea);
+  RegisterTest('paragraph / CJK wrap pure',                  @Test_CJKWrapPure);
+  RegisterTest('paragraph / CJK wrap mixed',                 @Test_CJKWrapMixed);
+  RegisterTest('paragraph / CJK width=1 no hang',            @Test_CJKWidth1);
 end;
 
 end.

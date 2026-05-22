@@ -332,9 +332,6 @@ begin
 
   for I := 0 to High(Text.Lines) do
   begin
-    SetLength(SpanIdxArrays[I], 0);
-    if Text.Lines[I].Width > 0 then
-      SetLength(SpanIdxArrays[I], Text.Lines[I].Width);
     FlattenLine(Text.Lines[I], FlatBufs[I], SpanIdxArrays[I]);
 
     if Text.Lines[I].HasAlignment then

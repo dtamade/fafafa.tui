@@ -224,6 +224,41 @@ begin
   Buf.Free;
 end;
 
+procedure Test_CJKMixedNav;
+var S: TInputState;
+begin
+  S := TInputState.Empty;
+  S.InsertStr('hi' + #$E4#$BD#$A0#$E5#$A5#$BD + 'ok');
+  // Text = "hi你好ok" (10 bytes)
+  AssertEqInt(10, S.Cursor, 'mixed: cursor at end');
+  S.MoveHome;
+  S.MoveRight; // h
+  S.MoveRight; // i
+  AssertEqInt(2, S.Cursor, 'mixed: after 2 rights = byte 2');
+  S.MoveRight; // 你 (3 bytes)
+  AssertEqInt(5, S.Cursor, 'mixed: skip 你 to byte 5');
+  S.MoveRight; // 好 (3 bytes)
+  AssertEqInt(8, S.Cursor, 'mixed: skip 好 to byte 8');
+  S.MoveLeft;  // back to 好 start
+  AssertEqInt(5, S.Cursor, 'mixed: left back to byte 5');
+  AssertEqInt(4, S.CursorCol, 'mixed: col at byte 5 = 4 (h+i+你)');
+end;
+
+procedure Test_CJKDeleteForward;
+var S: TInputState;
+begin
+  S := TInputState.Empty;
+  S.InsertChar(Ord('a'));
+  S.InsertChar($4F60);  // 你
+  S.InsertChar(Ord('b'));
+  // Text = "a你b" (5 bytes), Cursor=5
+  S.MoveHome;
+  S.MoveRight; // skip 'a', Cursor=1
+  S.DeleteForward; // delete 你 (3 bytes)
+  AssertEqStr('ab', S.Text, 'del fwd: 你 removed');
+  AssertEqInt(1, S.Cursor, 'del fwd: cursor stays at 1');
+end;
+
 procedure RegisterInputTests;
 begin
   RegisterTest('input / empty state',        @Test_EmptyState);
@@ -241,6 +276,8 @@ begin
   RegisterTest('input / scroll long text',   @Test_ScrollOnLongText);
   RegisterTest('input / CJK insert+move',   @Test_CJKInsertAndMove);
   RegisterTest('input / CJK mask',          @Test_CJKMask);
+  RegisterTest('input / CJK mixed nav',     @Test_CJKMixedNav);
+  RegisterTest('input / CJK delete forward', @Test_CJKDeleteForward);
 end;
 
 end.

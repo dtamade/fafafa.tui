@@ -131,11 +131,18 @@ var
   Cp: LongWord;
   Need: Integer;
 begin
+  if Offset >= Len then
+  begin
+    Assert(False, 'GraphemeAdvance: Offset >= Len');
+    Result.ByteLen := 0;
+    Result.Width := 0;
+    Result.Codepoint := 0;
+    Exit;
+  end;
+
   Result.ByteLen := 1;
   Result.Width := 1;
   Result.Codepoint := $FFFD;
-
-  if Offset >= Len then Exit;
 
   P := PByte(@Buf);
   B0 := P[Offset];
