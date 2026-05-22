@@ -47,6 +47,8 @@ uses
   ftui_block;
 
 type
+  TListDirection = (ldTopToBottom, ldBottomToTop);
+
   TListItem = record
     Content: AnsiString;
     Style: TStyle;
@@ -75,6 +77,7 @@ type
     HasHighlightSymbol: Boolean;
     HasBlock: Boolean;
     Block: TBlock;
+    Direction: TListDirection;
 
     class function Create(const AItems: array of TListItem): TList; static;
     class function FromStrings(const AItems: array of AnsiString): TList; static;
@@ -83,6 +86,7 @@ type
     function WithStyle(const S: TStyle): TList;
     function WithHighlightStyle(const S: TStyle): TList;
     function WithHighlightSymbol(const Sym: AnsiString): TList;
+    function WithDirection(D: TListDirection): TList;
 
     procedure Render(const Area: TRect; ABuf: TBuffer);
     procedure RenderStateful(const Area: TRect; ABuf: TBuffer; var State: TListState);
@@ -139,6 +143,7 @@ begin
   Result.HasHighlightSymbol := False;
   Result.HasBlock := False;
   Result.Block := TBlock.Default;
+  Result.Direction := ldTopToBottom;
 end;
 
 class function TList.FromStrings(const AItems: array of AnsiString): TList;
@@ -176,6 +181,12 @@ begin
   Result := Self;
   Result.HighlightSymbol := Sym;
   Result.HasHighlightSymbol := Length(Sym) > 0;
+end;
+
+function TList.WithDirection(D: TListDirection): TList;
+begin
+  Result := Self;
+  Result.Direction := D;
 end;
 
 procedure TList.Render(const Area: TRect; ABuf: TBuffer);
@@ -285,8 +296,11 @@ begin
     Blank := '';
 
   RowIdx := FirstVis;
-  RowY := Inner.Y;
-  while (RowIdx < LastVis) and (RowY < Inner.Y + Inner.Height) do
+  if Direction = ldBottomToTop then
+    RowY := Inner.Y + Integer(Inner.Height) - 1 - (LastVis - FirstVis - 1)
+  else
+    RowY := Inner.Y;
+  while (RowIdx < LastVis) and (RowY >= Inner.Y) and (RowY < Inner.Y + Inner.Height) do
   begin
     // Row base style: list.style patched with item.style.
     Sty := Style.Patch(Items[RowIdx].Style);

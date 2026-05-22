@@ -37,7 +37,9 @@ const
 type
   TSepTitle = record
     Text: AnsiString;
+    Style: TStyle;
     HasTitle: Boolean;
+    HasStyle: Boolean;
   end;
 
   TPanelGrid = record
@@ -96,6 +98,7 @@ type
     function WithHSepVisible(SepIndex: Integer; Visible: Boolean): TPanel;
     function WithVSepVisible(SepIndex: Integer; Visible: Boolean): TPanel;
     function WithHSepTitle(SepIndex: Integer; const ATitle: AnsiString): TPanel;
+    function WithHSepTitleStyle(SepIndex: Integer; const ATitle: AnsiString; const S: TStyle): TPanel;
     function WithFocus(Col, Row: Integer): TPanel;
     function WithFocusStyle(const S: TStyle): TPanel;
     function WithPadding(P: Byte): TPanel;
@@ -297,6 +300,19 @@ begin
   begin
     Result.FHSepTitles[SepIndex].Text := ATitle;
     Result.FHSepTitles[SepIndex].HasTitle := True;
+    Result.FHSepTitles[SepIndex].HasStyle := False;
+  end;
+end;
+
+function TPanel.WithHSepTitleStyle(SepIndex: Integer; const ATitle: AnsiString; const S: TStyle): TPanel;
+begin
+  Result := Self;
+  if (SepIndex >= 0) and (SepIndex < PANEL_MAX_HSEP) then
+  begin
+    Result.FHSepTitles[SepIndex].Text := ATitle;
+    Result.FHSepTitles[SepIndex].Style := S;
+    Result.FHSepTitles[SepIndex].HasTitle := True;
+    Result.FHSepTitles[SepIndex].HasStyle := True;
   end;
 end;
 
@@ -542,7 +558,12 @@ begin
         TitleLen := Length(FHSepTitles[J - 1].Text);
         TitleX := HStart + 2;
         if TitleX + TitleLen < Right_ then
-          ABuf.SetStringN(TitleX, SepY, FHSepTitles[J - 1].Text, TitleLen, Sty);
+        begin
+          if FHSepTitles[J - 1].HasStyle then
+            ABuf.SetStringN(TitleX, SepY, FHSepTitles[J - 1].Text, TitleLen, FHSepTitles[J - 1].Style)
+          else
+            ABuf.SetStringN(TitleX, SepY, FHSepTitles[J - 1].Text, TitleLen, Sty);
+        end;
       end;
     end;
 
