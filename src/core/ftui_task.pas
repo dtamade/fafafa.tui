@@ -64,11 +64,13 @@ type
     FFunc: TTaskFunc;
     FContext: TTaskContext;
     FManager: TTaskManager;
+    FDoneEvent: PRTLEvent;
   protected
     procedure Execute; override;
   public
     constructor Create(AManager: TTaskManager; AId: TTaskId;
                        AFunc: TTaskFunc; const ACtx: TTaskContext);
+    destructor Destroy; override;
   end;
 
   TActiveTask = record
@@ -149,7 +151,14 @@ begin
   FId := AId;
   FFunc := AFunc;
   FContext := ACtx;
-  inherited Create(False);
+  FDoneEvent := RTLEventCreate;
+  inherited Create(True);
+end;
+
+destructor TTaskThread.Destroy;
+begin
+  RTLEventDestroy(FDoneEvent);
+  inherited;
 end;
 
 procedure TTaskThread.Execute;
@@ -172,6 +181,7 @@ begin
   FManager.OnThreadComplete(FId, Res);
   if FContext.Param <> nil then
     FreeMem(FContext.Param);
+  RTLEventSetEvent(FDoneEvent);
 end;
 
 { TTaskManager }
@@ -241,6 +251,7 @@ begin
   Ctx.ParamSize := ParamSize;
   Ctx.Cancel := @FActive[Slot].Cancel;
   FActive[Slot].Thread := TTaskThread.Create(Self, Id, Func, Ctx);
+  FActive[Slot].Thread.Start;
 end;
 
 procedure TTaskManager.ScheduleNext;
@@ -287,6 +298,7 @@ begin
     Ctx.ParamSize := ToLaunch[I].ParamSize;
     Ctx.Cancel := @FActive[ToLaunch[I].Slot].Cancel;
     FActive[ToLaunch[I].Slot].Thread := TTaskThread.Create(Self, ToLaunch[I].Id, ToLaunch[I].Func, Ctx);
+    FActive[ToLaunch[I].Slot].Thread.Start;
   end;
 end;
 
@@ -351,6 +363,7 @@ begin
     Ctx.ParamSize := Spec.ParamSize;
     Ctx.Cancel := @FActive[Slot].Cancel;
     FActive[Slot].Thread := TTaskThread.Create(Self, Id, Spec.Func, Ctx);
+    FActive[Slot].Thread.Start;
   end;
 
   Result := Id;
@@ -482,7 +495,7 @@ begin
 
   for I := 0 to ThreadCount - 1 do
   begin
-    Threads[I].WaitFor;
+    RTLEventWaitFor(Threads[I].FDoneEvent, TimeoutMs);
     Threads[I].Free;
   end;
 
