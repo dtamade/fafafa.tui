@@ -120,6 +120,14 @@
 
 - v1.0 起：stable 单元的**类型定义和函数签名**在 v1.x 内不变
 - experimental 单元：每个 minor version 的 CHANGELOG 列出变化
+
+## rc1 → rc2 Breaking Changes
+
+| 单元 | 变更 | 原因 |
+|------|------|------|
+| `ftui_input` | `TInputState.InsertChar(Ch: Char)` → `InsertChar(Cp: LongWord)` | CJK/emoji 输入支持需要完整 codepoint |
+
+迁移方式：`State.InsertChar(Ord('x'))` 或直接传 `TKeyEvent.Ch`（已是 LongWord）。
 - internal 单元：不保证任何稳定性
 
 ## 集成建议

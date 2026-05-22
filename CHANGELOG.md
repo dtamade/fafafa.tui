@@ -1,5 +1,72 @@
 # Changelog
 
+## v1.0.0-rc2 (2026-05-22)
+
+CJK 全面修复 + TPanel 布局引擎。
+
+### Breaking Changes
+
+- `TInputState.InsertChar(Ch: Char)` → `TInputState.InsertChar(Cp: LongWord)`
+  支持 CJK/emoji 输入。迁移：`State.InsertChar(Ord('x'))` 或直接传 `Key.Ch`（已是 LongWord）。
+
+### 新增
+
+- **TPanel 布局引擎**（`ftui_panel.pas`）：
+  - 2D 网格布局，8×8 上限，零堆分配
+  - 5 种边框风格（Plain/Rounded/Double/Heavy/Dashed）
+  - WithSepSet / WithHSepStartCol / WithHSepStartColAt / WithVSepStartRow / WithVSepEndRow
+  - WithHSepVisible / WithVSepVisible / WithHSepTitle
+  - WithFocus / WithFocusStyle / WithPadding / WithCellPadding
+  - WithMinWidth / WithMinHeight / WithColWeight / WithRowWeight / WithDebug
+  - PanelCell / PanelCellPadded / PanelCellSpan / PanelHitTestSep
+  - 预设工厂：Sidebar / HSplit / Grid
+  - Junction 自动计算（4-bit lookup）
+- `TInputState.InsertStr` — 粘贴多字节字符串
+- `TInputState.CursorCol` / `TextWidth` — 显示宽度辅助
+- `GraphemeWidthRange` — 零分配范围列宽计算
+- `bench_fullscreen` — 200×60 端到端性能基线（632μs/frame）
+- `BorderSetDouble` / `BorderSetHeavy` / `BorderSetDashed` 边框字符集
+- 包分发：install.sh / fafafa_tui.mk / fafafa_tui.lpk / docs/getting-started.md
+
+### 修复
+
+- **CJK 渲染全面修复**：
+  - TParagraph：渲染循环改为 GraphemeAdvance，修复 CJK 乱码 + 右边框消失
+  - TParagraph：WrapOneLine 改为列宽累加，修复 CJK 不折行
+  - TParagraph：Width=1 + 宽字符时 force-advance 防止无限循环
+  - TParagraph：宽字符行尾溢出检查
+  - TInputState：编辑模型重写为 grapheme-aware
+  - TInput Mask 模式：cursor 映射改为 grapheme 索引
+  - 7 个 widget 布局修复：Length(S) → GraphemeWidth(S)
+    （table, statusbar, breadcrumb, menu, timeline, tooltip, dialog）
+- **内存安全**：
+  - CellEquals 加 SizeOf(TCell)=40 编译期断言
+  - EndFrame 去掉冗余 FMerged.Reset + 加空 buffer 保护
+  - TApp.Run 嵌套 try/finally 保证 OnDestroy 异常不跳过 LeaveTui
+  - TKanban/TFileTree State 索引渲染前 clamp
+  - TVirtualList State.Selected 超出 TotalItems 时自动 clamp
+- **信号处理**：GResizePending/GTermPending 改为 LongInt + InterlockedExchange
+- **输入解析**：ParseDecimal 加整数溢出保护（clamp 100000）
+- **编译兼容**：CompareMem → CompareByte（clean build 兼容）
+- **GraphemeAdvance**：Offset>=Len 时返回 ByteLen=0 + Assert
+- **热路径**：TVirtualList gutter 改为栈上 itoa，Markdown SetLength 倍增，
+  TParagraph LineW 改为 GraphemeWidthRange（零分配）
+
+### 性能
+
+| Benchmark | 结果 | 目标 |
+|-----------|------|------|
+| bench_fullscreen (200×60) | 632 μs/frame | < 2000 μs |
+| bench_diff (200×60) | 957 μs/frame | < 1000 μs |
+| bench_render (80×24) | 140 μs/frame | < 1000 μs |
+
+### 测试
+
+- 704 测试，0 failures，0 warnings
+- 新增 34 个 panel 测试 + 5 个 CJK 测试 + 7 个 input CJK 测试
+
+---
+
 ## v1.0.0-rc1 (2026-05-21)
 
 首个 release candidate。API 冻结——stable 单元的类型定义和函数签名在 v1.x 内不变。
