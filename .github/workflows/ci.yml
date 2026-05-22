@@ -7,21 +7,74 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+          - os: macos-latest
+            name: macOS
+          - os: windows-latest
+            name: Windows
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.name }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Free Pascal
+      # --- Install FPC ---
+      - name: Install FPC (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y fpc
 
-      - name: Run tests
+      - name: Install FPC (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fpc
+
+      - name: Install FPC (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install freepascal --yes --no-progress
+          $fpcPath = (Get-ChildItem -Path "C:\FPC" -Recurse -Filter "fpc.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).DirectoryName
+          if ($fpcPath) { echo $fpcPath | Out-File -FilePath $env:GITHUB_PATH -Append }
+
+      # --- Verify ---
+      - name: Check FPC version
+        run: fpc -iV
+
+      # --- Linux / macOS: use Makefile ---
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
         run: make test
 
-      - name: Run benchmarks
-        run: make bench
-
-      - name: Build examples
+      - name: Build examples (Unix)
+        if: runner.os != 'Windows'
         run: make examples
+
+      # --- Windows: direct fpc invocation (avoids Makefile/bash path issues) ---
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          if not exist build\bin mkdir build\bin
+          fpc -MObjFPC -Sh -O3 -gl -CR -Xs -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FEbuild\bin tests\test_runner.lpr
+          if errorlevel 1 exit /b 1
+          build\bin\test_runner.exe
+          if errorlevel 1 exit /b 1
+
+      - name: Build examples (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          if not exist build\bin mkdir build\bin
+          for %%f in (examples\*.lpr) do (
+            echo [BUILD] %%f
+            fpc -MObjFPC -Sh -O3 -gl -CR -Xs -Fusrc\core -Fusrc\text -Fusrc\layout -Fusrc\widgets -Fusrc\backend -Fusrc\terminal -Fusrc\input -Fusrc\app -Fusrc\platform -Futests -FEbuild\bin %%f
+            if errorlevel 1 exit /b 1
+          )
