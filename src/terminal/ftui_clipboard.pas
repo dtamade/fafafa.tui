@@ -30,7 +30,7 @@ type
 implementation
 
 uses
-  SysUtils, BaseUnix, Unix;
+  SysUtils{$IFDEF UNIX}, BaseUnix, Unix{$ENDIF};
 
 // ---------- Base64 encoder (self-contained) ----------
 
@@ -83,12 +83,18 @@ end;
 // ---------- Helpers ----------
 
 function ToolExists(const Name: AnsiString): Boolean;
+{$IFDEF UNIX}
 var
   Ret: Integer;
 begin
   Ret := fpSystem('command -v ' + Name + ' >/dev/null 2>&1');
   Result := (Ret = 0);
 end;
+{$ELSE}
+begin
+  Result := False;
+end;
+{$ENDIF}
 
 function IsOSC52Terminal: Boolean;
 var
@@ -193,6 +199,7 @@ begin
 end;
 
 function TClipboard.Copy(const Text: AnsiString): Boolean;
+{$IFDEF UNIX}
 var
   Seq, Cmd: AnsiString;
   F: System.Text;
@@ -218,8 +225,14 @@ begin
       Result := False;
   end;
 end;
+{$ELSE}
+begin
+  Result := False;
+end;
+{$ENDIF}
 
 function TClipboard.Paste: AnsiString;
+{$IFDEF UNIX}
 var
   Cmd: AnsiString;
   F: System.Text;
@@ -229,7 +242,6 @@ begin
   Result := '';
   case Method of
     cmOSC52:
-      // OSC 52 paste is not reliably supported
       Result := '';
     cmExternal:
     begin
@@ -252,5 +264,10 @@ begin
       Result := '';
   end;
 end;
+{$ELSE}
+begin
+  Result := '';
+end;
+{$ENDIF}
 
 end.
