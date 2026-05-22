@@ -22,7 +22,10 @@ type
     IntervalMs: Integer;
 
     class function Create(Kind: TSpinnerKind): TSpinner; static;
+    class function Custom(const AFrames: array of AnsiString; AIntervalMs: Integer): TSpinner; static;
     function Frame(Tick: Integer): AnsiString;
+    function FrameAt(ElapsedMs: QWord): AnsiString;
+    function IsAnimating: Boolean; inline;
   end;
 
   TTransition = record
@@ -193,6 +196,16 @@ begin
   end;
 end;
 
+class function TSpinner.Custom(const AFrames: array of AnsiString; AIntervalMs: Integer): TSpinner;
+var
+  I: Integer;
+begin
+  SetLength(Result.Frames, Length(AFrames));
+  for I := 0 to High(AFrames) do
+    Result.Frames[I] := AFrames[I];
+  Result.IntervalMs := AIntervalMs;
+end;
+
 function TSpinner.Frame(Tick: Integer): AnsiString;
 var
   N: Integer;
@@ -202,6 +215,29 @@ begin
     Result := ''
   else
     Result := Frames[((Tick mod N) + N) mod N];
+end;
+
+function TSpinner.FrameAt(ElapsedMs: QWord): AnsiString;
+var
+  N: Integer;
+  Idx: QWord;
+begin
+  N := Length(Frames);
+  if N = 0 then
+    Result := ''
+  else
+  begin
+    if IntervalMs <= 0 then
+      Idx := 0
+    else
+      Idx := (ElapsedMs div QWord(IntervalMs)) mod QWord(N);
+    Result := Frames[Idx];
+  end;
+end;
+
+function TSpinner.IsAnimating: Boolean;
+begin
+  Result := Length(Frames) > 1;
 end;
 
 class function TTransition.Create(AStart, AEnd: Double; ADurationMs: Integer): TTransition;

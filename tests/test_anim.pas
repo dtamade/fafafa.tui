@@ -135,6 +135,55 @@ begin
   AssertFalse(Tr.Done, 'After reset, not done');
 end;
 
+procedure Test_SpinnerFrameAt;
+var
+  S: TSpinner;
+begin
+  S := TSpinner.Create(skDots);
+  AssertEqStr(S.Frames[0], S.FrameAt(0), 'FrameAt(0) = first');
+  AssertEqStr(S.Frames[1], S.FrameAt(80), 'FrameAt(80) = second (80ms interval)');
+  AssertEqStr(S.Frames[2], S.FrameAt(160), 'FrameAt(160) = third');
+  AssertEqStr(S.Frames[0], S.FrameAt(800), 'FrameAt(800) wraps to first (10 frames * 80ms)');
+  AssertEqStr(S.Frames[3], S.FrameAt(240), 'FrameAt(240) = fourth');
+end;
+
+procedure Test_SpinnerCustom;
+var
+  S: TSpinner;
+begin
+  S := TSpinner.Custom(['A', 'B', 'C'], 100);
+  AssertEqInt(3, Length(S.Frames), 'Custom has 3 frames');
+  AssertEqInt(100, S.IntervalMs, 'Custom interval = 100');
+  AssertEqStr('A', S.Frame(0), 'Custom frame 0');
+  AssertEqStr('B', S.Frame(1), 'Custom frame 1');
+  AssertEqStr('C', S.Frame(2), 'Custom frame 2');
+  AssertEqStr('A', S.Frame(3), 'Custom frame 3 wraps');
+end;
+
+procedure Test_SpinnerIsAnimating;
+var
+  S: TSpinner;
+  Single: TSpinner;
+  Empty: TSpinner;
+begin
+  S := TSpinner.Create(skDots);
+  AssertTrue(S.IsAnimating, 'Spinner with multiple frames is animating');
+  Single := TSpinner.Custom(['X'], 80);
+  AssertFalse(Single.IsAnimating, 'Single-frame spinner is not animating');
+  SetLength(Empty.Frames, 0);
+  Empty.IntervalMs := 80;
+  AssertFalse(Empty.IsAnimating, 'Empty spinner is not animating');
+end;
+
+procedure Test_SpinnerFrameAtZeroInterval;
+var
+  S: TSpinner;
+begin
+  S := TSpinner.Custom(['A', 'B', 'C'], 0);
+  AssertEqStr('A', S.FrameAt(0), 'FrameAt with interval=0 returns first frame');
+  AssertEqStr('A', S.FrameAt(9999), 'FrameAt with interval=0 always returns first frame');
+end;
+
 procedure RegisterAnimTests;
 begin
   RegisterTest('anim / EaseLinear endpoints',          @Test_EaseLinearEndpoints);
@@ -146,6 +195,10 @@ begin
   RegisterTest('anim / LerpF float',                   @Test_LerpFloat);
   RegisterTest('anim / Spinner frame cycles',          @Test_SpinnerFrameCycles);
   RegisterTest('anim / Spinner skLine has 4 frames',   @Test_SpinnerLineHas4Frames);
+  RegisterTest('anim / Spinner FrameAt time-based',    @Test_SpinnerFrameAt);
+  RegisterTest('anim / Spinner Custom constructor',    @Test_SpinnerCustom);
+  RegisterTest('anim / Spinner IsAnimating',           @Test_SpinnerIsAnimating);
+  RegisterTest('anim / Spinner FrameAt zero interval', @Test_SpinnerFrameAtZeroInterval);
   RegisterTest('anim / Transition starts at StartVal', @Test_TransitionStartsAtStartVal);
   RegisterTest('anim / Transition ends at EndVal',     @Test_TransitionEndsAtEndVal);
   RegisterTest('anim / Transition advance works',      @Test_TransitionAdvanceWorks);

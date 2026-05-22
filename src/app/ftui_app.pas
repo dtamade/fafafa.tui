@@ -5,6 +5,7 @@ unit ftui_app;
 interface
 
 uses
+  SysUtils,
   ftui_rect,
   ftui_event,
   ftui_terminal,
@@ -31,6 +32,10 @@ type
     FOnRender: TAppRenderProc;
     FOnEvent: TAppEventProc;
     FOnTick: TAppTickProc;
+    FAnimTickInterval: Integer;
+    FIdleTickInterval: Integer;
+    FAnimationRequested: Boolean;
+    FStartTime: QWord;
   protected
     procedure Render(var Frame: TFrame); virtual;
     procedure HandleEvent(const Ev: TEvent); virtual;
@@ -50,17 +55,38 @@ type
     procedure Quit;
     procedure EnableFocus;
     procedure EnableBudget(BudgetMs: Double);
+    procedure RequestAnimationFrame;
+    function ElapsedMs: QWord;
     property Terminal: TTerminal read FTerminal;
     property Focus: TFocusManager read FFocus;
     property Budget: TFrameBudget read FBudget;
     property TickInterval: Integer read FTickInterval write FTickInterval;
     property TickCount: Integer read FTickCount;
+    property AnimTickInterval: Integer read FAnimTickInterval write FAnimTickInterval;
+    property IdleTickInterval: Integer read FIdleTickInterval write FIdleTickInterval;
     property OnRenderCb: TAppRenderProc read FOnRender write FOnRender;
     property OnEventCb: TAppEventProc read FOnEvent write FOnEvent;
     property OnTickCb: TAppTickProc read FOnTick write FOnTick;
   end;
 
 implementation
+
+uses
+  {$IFDEF LINUX}BaseUnix, Linux{$ENDIF};
+
+function GetTickCount64: QWord;
+{$IFDEF LINUX}
+var
+  ts: TimeSpec;
+begin
+  clock_gettime(CLOCK_MONOTONIC, @ts);
+  Result := QWord(ts.tv_sec) * 1000 + QWord(ts.tv_nsec) div 1000000;
+end;
+{$ELSE}
+begin
+  Result := SysUtils.GetTickCount64;
+end;
+{$ENDIF}
 
 constructor TApp.Create;
 begin
@@ -75,6 +101,10 @@ begin
   FOnRender := nil;
   FOnEvent := nil;
   FOnTick := nil;
+  FAnimTickInterval := 33;
+  FIdleTickInterval := 200;
+  FAnimationRequested := False;
+  FStartTime := 0;
 end;
 
 destructor TApp.Destroy;
@@ -103,6 +133,16 @@ begin
   FTerminal.RequestQuit;
 end;
 
+procedure TApp.RequestAnimationFrame;
+begin
+  FAnimationRequested := True;
+end;
+
+function TApp.ElapsedMs: QWord;
+begin
+  Result := GetTickCount64 - FStartTime;
+end;
+
 function TApp.DoEnterTui: Boolean;
 begin
   Result := FTerminal.EnterTui;
@@ -114,8 +154,16 @@ begin
 end;
 
 function TApp.DoPollEvent: TEvent;
+var
+  Timeout: Integer;
 begin
-  Result := FTerminal.PollEvent(FTickInterval);
+  if FTickInterval >= 0 then
+    Timeout := FTickInterval
+  else if FAnimationRequested then
+    Timeout := FAnimTickInterval
+  else
+    Timeout := FIdleTickInterval;
+  Result := FTerminal.PollEvent(Timeout);
 end;
 
 function TApp.DoBeginFrame: TFrame;
@@ -139,9 +187,11 @@ begin
     Halt(1);
   end;
   try
+    FStartTime := GetTickCount64;
     OnInit;
     while not FShouldQuit do
     begin
+      FAnimationRequested := False;
       if FUseBudget then FBudget.BeginFrame;
       if FUseFocus then FFocus.BeginFrame;
       Frame := DoBeginFrame;
