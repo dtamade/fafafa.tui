@@ -41,8 +41,26 @@ jobs:
         shell: powershell
         run: |
           choco install freepascal --yes --no-progress
-          $fpcPath = (Get-ChildItem -Path "C:\FPC" -Recurse -Filter "fpc.exe" -ErrorAction SilentlyContinue | Select-Object -First 1).DirectoryName
-          if ($fpcPath) { echo $fpcPath | Out-File -FilePath $env:GITHUB_PATH -Append }
+          # Add common FPC install paths
+          $paths = @(
+            "C:\FPC\3.2.2\bin\i386-win32",
+            "C:\FPC\bin\i386-win32",
+            "C:\tools\freepascal\bin",
+            "C:\ProgramData\chocolatey\lib\freepascal\tools\bin\i386-win32"
+          )
+          foreach ($p in $paths) {
+            if (Test-Path "$p\fpc.exe") {
+              echo "Found FPC at: $p"
+              echo $p | Out-File -FilePath $env:GITHUB_PATH -Append
+              break
+            }
+          }
+          # Fallback: search Program Files
+          $found = Get-ChildItem -Path "C:\Program Files","C:\Program Files (x86)","C:\FPC","C:\ProgramData\chocolatey" -Recurse -Filter "fpc.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($found) {
+            echo "Fallback found: $($found.DirectoryName)"
+            echo $found.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Append
+          }
 
       # --- Verify ---
       - name: Check FPC version

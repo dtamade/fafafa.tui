@@ -2,6 +2,8 @@
 
 {$IFDEF LINUX}
 uses Linux;
+{$ELSE}
+uses Unix;
 {$ENDIF}
 
 const
