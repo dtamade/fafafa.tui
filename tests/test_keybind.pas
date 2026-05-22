@@ -39,6 +39,7 @@ begin
   KM := TKeybindManager.Create;
   KM.BindChar(kmNormal, 'q', @TestAction, 'Quit');
   ActionCalled := False;
+  FillChar(K, SizeOf(K), 0);
   K.Code := kcChar;
   K.Ch := Ord('q');
   AssertTrue(KM.HandleKey(K), 'handled');
@@ -54,12 +55,11 @@ begin
   KM := TKeybindManager.Create;
   KM.BindChar(kmInsert, 'a', @TestAction, 'Insert a');
   ActionCalled := False;
+  FillChar(K, SizeOf(K), 0);
   K.Code := kcChar;
   K.Ch := Ord('a');
-  // In normal mode, should not trigger
   AssertTrue(not KM.HandleKey(K), 'not handled in normal');
   AssertTrue(not ActionCalled, 'not called');
-  // Switch to insert
   KM.SetMode(kmInsert);
   AssertTrue(KM.HandleKey(K), 'handled in insert');
   AssertTrue(ActionCalled, 'called in insert');
@@ -74,8 +74,8 @@ begin
   KM := TKeybindManager.Create;
   KM.BindKey(kmNormal, kcUp, @TestAction, 'Move up');
   ActionCalled := False;
+  FillChar(K, SizeOf(K), 0);
   K.Code := kcUp;
-  K.Ch := 0;
   AssertTrue(KM.HandleKey(K), 'up handled');
   AssertTrue(ActionCalled, 'up action called');
   KM.Free;
@@ -88,9 +88,30 @@ var
 begin
   KM := TKeybindManager.Create;
   KM.BindChar(kmNormal, 'q', @TestAction, 'Quit');
+  FillChar(K, SizeOf(K), 0);
   K.Code := kcChar;
   K.Ch := Ord('x');
   AssertTrue(not KM.HandleKey(K), 'x not handled');
+  KM.Free;
+end;
+
+procedure Test_ModifierMatching;
+var
+  KM: TKeybindManager;
+  K: TKeyEvent;
+begin
+  KM := TKeybindManager.Create;
+  KM.BindCtrl(kmNormal, 's', @TestAction, 'Save');
+  ActionCalled := False;
+  FillChar(K, SizeOf(K), 0);
+  K.Code := kcChar;
+  K.Ch := Ord('s');
+  K.Modifiers := [];
+  AssertTrue(not KM.HandleKey(K), 'bare s not handled');
+  AssertFalse(ActionCalled, 'action not called for bare s');
+  K.Modifiers := [kmCtrl];
+  AssertTrue(KM.HandleKey(K), 'Ctrl+s handled');
+  AssertTrue(ActionCalled, 'action called for Ctrl+s');
   KM.Free;
 end;
 
@@ -101,9 +122,11 @@ var
 begin
   KM := TKeybindManager.Create;
   KM.BindChar(kmNormal, 'q', @TestAction, 'Quit app');
+  KM.BindCtrl(kmNormal, 's', @TestAction, 'Save');
   KM.BindKey(kmNormal, kcUp, @TestAction, 'Move up');
   Help := KM.HelpText;
   AssertTrue(Pos('Quit app', Help) > 0, 'help has quit');
+  AssertTrue(Pos('C-s', Help) > 0, 'help has C-s');
   AssertTrue(Pos('Move up', Help) > 0, 'help has move up');
   KM.Free;
 end;
@@ -122,13 +145,14 @@ end;
 
 procedure RegisterKeybindTests;
 begin
-  RegisterTest('keybind / create manager',    @Test_CreateManager);
-  RegisterTest('keybind / bind and handle',   @Test_BindAndHandle);
-  RegisterTest('keybind / mode filtering',    @Test_ModeFiltering);
-  RegisterTest('keybind / bind key',          @Test_BindKey);
-  RegisterTest('keybind / unhandled key',     @Test_UnhandledKey);
-  RegisterTest('keybind / help text',         @Test_HelpText);
-  RegisterTest('keybind / multiple bindings', @Test_MultipleBindings);
+  RegisterTest('keybind / create manager',      @Test_CreateManager);
+  RegisterTest('keybind / bind and handle',     @Test_BindAndHandle);
+  RegisterTest('keybind / mode filtering',      @Test_ModeFiltering);
+  RegisterTest('keybind / bind key',            @Test_BindKey);
+  RegisterTest('keybind / unhandled key',       @Test_UnhandledKey);
+  RegisterTest('keybind / modifier matching',   @Test_ModifierMatching);
+  RegisterTest('keybind / help text',           @Test_HelpText);
+  RegisterTest('keybind / multiple bindings',   @Test_MultipleBindings);
 end;
 
 end.

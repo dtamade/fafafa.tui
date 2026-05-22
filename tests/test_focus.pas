@@ -19,7 +19,7 @@ var FM: TFocusManager;
 begin
   FM := TFocusManager.Create;
   try
-    AssertEqInt(0, FM.Count_, 'empty');
+    AssertEqInt(0, FM.EntryCount, 'empty');
     AssertTrue(FM.FocusedId = FOCUS_NONE, 'no focus');
   finally FM.Free; end;
 end;
@@ -31,7 +31,7 @@ begin
   try
     Id := FM.Register(TRect.Make(0, 0, 10, 3));
     AssertTrue(FM.IsFocused(Id), 'first registered gets focus');
-    AssertEqInt(1, FM.Count_, 'count 1');
+    AssertEqInt(1, FM.EntryCount, 'count 1');
   finally FM.Free; end;
 end;
 
@@ -133,9 +133,9 @@ begin
   FM := TFocusManager.Create;
   try
     A := FM.Register(TRect.Make(0, 0, 10, 1));
-    AssertEqInt(1, FM.Count_, 'has 1');
+    AssertEqInt(1, FM.EntryCount, 'has 1');
     FM.BeginFrame;
-    AssertEqInt(0, FM.Count_, 'cleared after BeginFrame');
+    AssertEqInt(0, FM.EntryCount, 'cleared after BeginFrame');
     AssertTrue(FM.FocusedId = A, 'focus preserved across frames');
   finally FM.Free; end;
 end;

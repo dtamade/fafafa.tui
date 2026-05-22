@@ -40,7 +40,7 @@ type
     function IsFocused(Id: TFocusId): Boolean; inline;
     function FocusedId: TFocusId; inline;
     function FocusedArea: TRect;
-    function Count_: Integer; inline;
+    function EntryCount: Integer; inline;
     procedure Navigate(Nav: TFocusNav);
     procedure FocusOn(Id: TFocusId);
     function HandleKey(const K: TKeyEvent): Boolean;
@@ -95,7 +95,7 @@ begin
   Result := FCurrent;
 end;
 
-function TFocusManager.Count_: Integer;
+function TFocusManager.EntryCount: Integer;
 begin
   Result := FCount;
 end;

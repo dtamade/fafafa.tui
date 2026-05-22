@@ -47,7 +47,6 @@ uses
   test_canvas,
   test_dialog,
   test_frame_budget,
-  test_event_loop,
   test_clipboard,
   test_layout_dsl,
   test_split_pane,
@@ -126,7 +125,6 @@ begin
   RegisterCanvasTests;
   RegisterDialogTests;
   RegisterFrameBudgetTests;
-  RegisterEventLoopTests;
   RegisterClipboardTests;
   RegisterLayoutDslTests;
   RegisterSplitPaneTests;

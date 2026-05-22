@@ -205,6 +205,9 @@ var
   I, Total: Integer;
   DstCell: PCell;
 begin
+  Assert((Base.Area.X = Dest.Area.X) and (Base.Area.Y = Dest.Area.Y)
+    and (Base.Area.Width = Dest.Area.Width) and (Base.Area.Height = Dest.Area.Height),
+    'MergeInto: Base and Dest must have same Area');
   Total := Length(FMarks);
   if Total = 0 then Exit;
   // Dest should already be a copy of Base or freshly filled from Base.
