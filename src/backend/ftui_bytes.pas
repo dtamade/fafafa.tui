@@ -55,7 +55,7 @@ function NewByteBuilder: TByteBuilder; inline;
 implementation
 
 uses
-  BaseUnix;
+  ftui_platform;
 
 { TByteBuilder }
 
@@ -174,26 +174,9 @@ begin
 end;
 
 function TByteBuilder.FlushTo(Fd: LongInt): Boolean;
-var
-  Sent, Total, Wrote: Integer;
-  P: PByte;
 begin
   if FLen = 0 then Exit(True);
-  Total := FLen;
-  Sent := 0;
-  P := @FData[0];
-  while Sent < Total do
-  begin
-    Wrote := fpWrite(Fd, (P + Sent)^, Total - Sent);
-    if Wrote < 0 then
-    begin
-      if fpGetErrno = ESysEINTR then Continue;
-      Exit(False);
-    end;
-    if Wrote = 0 then Exit(False);
-    Inc(Sent, Wrote);
-  end;
-  Result := True;
+  Result := PlatformWrite(TPlatformFd(Fd), @FData[0], FLen);
 end;
 
 end.

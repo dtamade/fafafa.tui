@@ -75,21 +75,7 @@ type
 implementation
 
 uses
-  {$IFDEF LINUX}BaseUnix, Linux{$ENDIF};
-
-function GetTickCount64: QWord;
-{$IFDEF LINUX}
-var
-  ts: TimeSpec;
-begin
-  clock_gettime(CLOCK_MONOTONIC, @ts);
-  Result := QWord(ts.tv_sec) * 1000 + QWord(ts.tv_nsec) div 1000000;
-end;
-{$ELSE}
-begin
-  Result := SysUtils.GetTickCount64;
-end;
-{$ENDIF}
+  ftui_platform;
 
 constructor TApp.Create;
 begin
@@ -145,7 +131,7 @@ end;
 
 function TApp.ElapsedMs: QWord;
 begin
-  Result := GetTickCount64 - FStartTime;
+  Result := PlatformTickMs - FStartTime;
 end;
 
 function TApp.DoEnterTui: Boolean;
@@ -192,7 +178,7 @@ begin
     Halt(1);
   end;
   try
-    FStartTime := GetTickCount64;
+    FStartTime := PlatformTickMs;
     OnInit;
     while not FShouldQuit do
     begin

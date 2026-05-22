@@ -38,7 +38,7 @@ type
 implementation
 
 uses
-  SysUtils;
+  ftui_platform;
 
 { TFrameStats }
 
@@ -83,14 +83,14 @@ end;
 
 procedure TFrameBudget.BeginFrame;
 begin
-  FrameStart := GetTickCount64;
+  FrameStart := PlatformTickMs;
   ShouldDegrade := False;
 end;
 
 procedure TFrameBudget.EndFrame;
 var Ms: Double;
 begin
-  Ms := GetTickCount64 - FrameStart;
+  Ms := PlatformTickMs - FrameStart;
   Stats.LastMs := Ms;
   Stats.TotalMs := Stats.TotalMs + Ms;
   Inc(Stats.FrameCount);
@@ -108,7 +108,7 @@ end;
 
 function TFrameBudget.ElapsedMs: Double;
 begin
-  Result := GetTickCount64 - FrameStart;
+  Result := PlatformTickMs - FrameStart;
 end;
 
 function TFrameBudget.IsOverBudget: Boolean;

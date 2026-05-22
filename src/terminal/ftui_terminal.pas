@@ -35,8 +35,7 @@ unit ftui_terminal;
 interface
 
 uses
-  BaseUnix,
-  termio,
+  ftui_platform,
   ftui_rect,
   ftui_buffer,
   ftui_overlay,
@@ -71,7 +70,7 @@ type
     FFrame: TFrame;
     FPatches: TDiffEntries;
     FInRawMode: Boolean;
-    FSavedTermios: TermIOS;
+    FSavedTermios: TPlatformTermState;
     FInputQueue: array of Byte;
     FInputLen: Integer;
     FShouldQuit: Boolean;
@@ -133,65 +132,35 @@ uses
   SysUtils,
   ftui_cell;
 
-// SIGWINCH flag.  Module-global because the signal handler needs C
-// linkage and can't capture context.  Single TTerminal at a time is
-// the assumed contract — fafafa.tui is process-scoped.
-// Use LongInt + InterlockedExchange for async-signal-safe volatile semantics.
 var
-  GResizePending: LongInt = 0;
-  GTermPending: LongInt = 0;
   GSigwinchHooked: Boolean = False;
   GSigtermHooked: Boolean = False;
-  GSavedSigwinch: SigActionRec;
-  GSavedSigterm: SigActionRec;
-
-procedure FtuiSigwinchHandler(Sig: cint); cdecl;
-begin
-  InterlockedExchange(GResizePending, 1);
-end;
-
-procedure FtuiSigtermHandler(Sig: cint); cdecl;
-begin
-  InterlockedExchange(GTermPending, 1);
-end;
 
 procedure HookSigwinch;
-var
-  Act: SigActionRec;
 begin
   if GSigwinchHooked then Exit;
-  FillChar(Act, SizeOf(Act), 0);
-  Act.sa_handler := SigActionHandler(@FtuiSigwinchHandler);
-  fpSigEmptySet(Act.sa_mask);
-  Act.sa_flags := SA_RESTART;
-  fpSigAction(SIGWINCH, @Act, @GSavedSigwinch);
+  PlatformHookResize;
   GSigwinchHooked := True;
 end;
 
 procedure HookSigterm;
-var
-  Act: SigActionRec;
 begin
   if GSigtermHooked then Exit;
-  FillChar(Act, SizeOf(Act), 0);
-  Act.sa_handler := SigActionHandler(@FtuiSigtermHandler);
-  fpSigEmptySet(Act.sa_mask);
-  Act.sa_flags := 0;
-  fpSigAction(SIGTERM, @Act, @GSavedSigterm);
+  PlatformHookTerminate;
   GSigtermHooked := True;
 end;
 
 procedure UnhookSigwinch;
 begin
   if not GSigwinchHooked then Exit;
-  fpSigAction(SIGWINCH, @GSavedSigwinch, nil);
+  PlatformUnhookResize;
   GSigwinchHooked := False;
 end;
 
 procedure UnhookSigterm;
 begin
   if not GSigtermHooked then Exit;
-  fpSigAction(SIGTERM, @GSavedSigterm, nil);
+  PlatformUnhookTerminate;
   GSigtermHooked := False;
 end;
 
@@ -368,10 +337,10 @@ var
   Sz: TTermSize;
 begin
   HasResize := False;
-  if InterlockedExchange(GTermPending, 0) <> 0 then
+  if PlatformConsumeTerminate then
     RequestQuit;
-  if InterlockedExchange(GResizePending, 0) = 0 then Exit;
-  if not GetTerminalSize(STDOUT_FD, Sz) then Exit;
+  if not PlatformConsumeResize then Exit;
+  if not PlatformGetTermSize(PLATFORM_STDOUT, Sz) then Exit;
   ResizeBuffersTo(Sz.Cols, Sz.Rows);
   ResizeOut := ResizeEvent(Sz.Cols, Sz.Rows);
   HasResize := True;
@@ -388,7 +357,7 @@ begin
     SetLength(FInputQueue, Length(FInputQueue) * 2);
     Capacity := Length(FInputQueue) - FInputLen;
   end;
-  Got := fpRead(STDIN_FD, FInputQueue[FInputLen], Capacity);
+  Got := PlatformRead(PLATFORM_STDIN, @FInputQueue[FInputLen], Capacity);
   if Got > 0 then
   begin
     Inc(FInputLen, Got);

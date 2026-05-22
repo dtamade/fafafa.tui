@@ -23,6 +23,7 @@ FTUI_FPC_FLAGS := \
 	-Fu$(FTUI_SRC)/backend \
 	-Fu$(FTUI_SRC)/terminal \
 	-Fu$(FTUI_SRC)/input \
-	-Fu$(FTUI_SRC)/app
+	-Fu$(FTUI_SRC)/app \
+	-Fu$(FTUI_SRC)/platform
 
 FTUI_CFG := $(FTUI_ROOT)/fafafa_tui.cfg

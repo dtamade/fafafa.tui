@@ -31,6 +31,7 @@ cat > "$CFG_FILE" <<EOF
 -Fu${SCRIPT_DIR}/src/terminal
 -Fu${SCRIPT_DIR}/src/input
 -Fu${SCRIPT_DIR}/src/app
+-Fu${SCRIPT_DIR}/src/platform
 EOF
 
 echo "Generated: $CFG_FILE"
