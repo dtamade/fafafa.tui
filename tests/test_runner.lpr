@@ -8,6 +8,7 @@ program test_runner;
 {$mode objfpc}{$H+}
 
 uses
+  {$IFDEF UNIX}cthreads,{$ENDIF}
   SysUtils,
   ftui_testkit,
   test_rect,
@@ -83,7 +84,8 @@ uses
   test_modal,
   test_format,
   test_terminal,
-  test_panel;
+  test_panel,
+  test_task;
 
 var
   Failed: Integer;
@@ -162,6 +164,7 @@ begin
   RegisterFormatTests;
   RegisterTerminalTests;
   RegisterPanelTests;
+  RegisterTaskTests;
   Failed := RunAllTests;
   if Failed = 0 then
     Halt(0)

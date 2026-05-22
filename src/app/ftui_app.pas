@@ -10,7 +10,8 @@ uses
   ftui_event,
   ftui_terminal,
   ftui_focus,
-  ftui_frame_budget;
+  ftui_frame_budget,
+  ftui_task;
 
 type
   TApp = class;
@@ -36,6 +37,7 @@ type
     FIdleTickInterval: Integer;
     FAnimationRequested: Boolean;
     FStartTime: QWord;
+    FTasks: TTaskManager;
   protected
     procedure Render(var Frame: TFrame); virtual;
     procedure HandleEvent(const Ev: TEvent); virtual;
@@ -64,6 +66,7 @@ type
     property TickCount: Integer read FTickCount;
     property AnimTickInterval: Integer read FAnimTickInterval write FAnimTickInterval;
     property IdleTickInterval: Integer read FIdleTickInterval write FIdleTickInterval;
+    property Tasks: TTaskManager read FTasks;
     property OnRenderCb: TAppRenderProc read FOnRender write FOnRender;
     property OnEventCb: TAppEventProc read FOnEvent write FOnEvent;
     property OnTickCb: TAppTickProc read FOnTick write FOnTick;
@@ -92,6 +95,7 @@ constructor TApp.Create;
 begin
   inherited Create;
   FTerminal := TTerminal.Create;
+  FTasks := TTaskManager.Create;
   FFocus := nil;
   FUseFocus := False;
   FUseBudget := False;
@@ -109,6 +113,7 @@ end;
 
 destructor TApp.Destroy;
 begin
+  FTasks.Free;
   FFocus.Free;
   FTerminal.Free;
   inherited;
@@ -159,7 +164,7 @@ var
 begin
   if FTickInterval >= 0 then
     Timeout := FTickInterval
-  else if FAnimationRequested then
+  else if FAnimationRequested or (FTasks.ActiveCount > 0) then
     Timeout := FAnimTickInterval
   else
     Timeout := FIdleTickInterval;
