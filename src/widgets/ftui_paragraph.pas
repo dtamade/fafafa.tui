@@ -255,7 +255,15 @@ begin
     end
     else
     begin
+      // Hard break — single word wider than Width
       LineEnd := P;
+      // If we couldn't fit even one grapheme, force-advance to avoid infinite loop
+      if LineEnd = LineStart then
+      begin
+        Adv := GraphemeAdvance(FlatBuf[1], Total, P);
+        Inc(P, Adv.ByteLen);
+        LineEnd := P;
+      end;
     end;
 
     if OutCount < Length(Out_) then
@@ -372,7 +380,7 @@ begin
     SrcLine := WL.SrcLine;
 
     // Calculate display width of this wrapped line
-    LineW := GraphemeWidth(Copy(FlatBufs[SrcLine], WL.ByteStart + 1, WL.ByteEnd - WL.ByteStart));
+    LineW := GraphemeWidthRange(FlatBufs[SrcLine], WL.ByteStart, WL.ByteEnd);
     if LineW > Inner.Width then LineW := Inner.Width;
     OffsetX := GetLineOffset(LineW, Inner.Width, WL.Alignment);
 

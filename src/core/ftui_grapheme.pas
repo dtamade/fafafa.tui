@@ -45,6 +45,7 @@ function GraphemeAdvance(const Buf; Len, Offset: Integer): TGraphemeAdvance;
 // Width sum over an AnsiString.  ASCII fast path: if every byte is
 // < 128, returns Length(S).  Otherwise walks via GraphemeAdvance.
 function GraphemeWidth(const S: AnsiString): Integer;
+function GraphemeWidthRange(const S: AnsiString; ByteStart, ByteEnd: Integer): Integer;
 
 // Just the column width for one decoded codepoint.  Public for tests.
 function CodepointWidth(Cp: LongWord): Integer; inline;
@@ -232,6 +233,24 @@ begin
     Inc(I, Adv.ByteLen);
   end;
   Result := Total;
+end;
+
+function GraphemeWidthRange(const S: AnsiString; ByteStart, ByteEnd: Integer): Integer;
+var
+  P, L: Integer;
+  Adv: TGraphemeAdvance;
+begin
+  Result := 0;
+  L := Length(S);
+  if (ByteStart >= ByteEnd) or (L = 0) then Exit;
+  P := ByteStart;
+  while P < ByteEnd do
+  begin
+    if P >= L then Break;
+    Adv := GraphemeAdvance(S[1], L, P);
+    Inc(Result, Adv.Width);
+    Inc(P, Adv.ByteLen);
+  end;
 end;
 
 end.
