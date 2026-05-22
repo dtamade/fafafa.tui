@@ -9,7 +9,6 @@ procedure RegisterInputTests;
 implementation
 
 uses
-  SysUtils,
   ftui_testkit,
   ftui_rect,
   ftui_style,

@@ -21,7 +21,6 @@ unit ftui_buffer;
 interface
 
 uses
-  SysUtils,
   ftui_rect,
   ftui_color,
   ftui_modifier,

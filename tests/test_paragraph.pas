@@ -244,6 +244,7 @@ begin
   AssertTrue(Pos(#$E4#$BD#$A0, Row1) > 0, 'cjk wrap: row 0 has 你');
   AssertTrue(Pos(#$E4#$B8#$96, Row2) > 0, 'cjk wrap: row 1 has 世');
   AssertTrue(Pos(#$E5#$86#$8D, Row3) > 0, 'cjk wrap: row 2 has 再');
+  Buf.Free;
 end;
 
 procedure Test_CJKWrapMixed;
@@ -257,6 +258,7 @@ begin
   Row1 := Buf.RowAsString(1);
   AssertTrue(Pos('hello', Row0) > 0, 'mixed wrap: row 0 has hello');
   AssertTrue(Length(Row1) > 0, 'mixed wrap: row 1 has content');
+  Buf.Free;
 end;
 
 procedure Test_CJKWidth1;
